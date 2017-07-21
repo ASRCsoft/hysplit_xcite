@@ -228,6 +228,22 @@
 	     info.update(layer.feature.properties);
 	 }
 
+	 function highlightSiteMarker(e) {
+	     var marker = e.target;
+	     marker.setStyle({
+		 opacity: .6
+	     });
+	     if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
+		 layer.bringToFront();
+	     }
+	     info.update(marker.feature.properties);
+	 }
+
+	 function resetHighlight(e) {
+	     pm_layer.resetStyle(e.target);
+	     info.update();
+	 }
+
 	 function resetHighlight(e) {
 	     pm_layer.resetStyle(e.target);
 	     info.update();
@@ -237,9 +253,17 @@
 	     map.fitBounds(e.target.getBounds());
 	 }
 
-	 function onEachFeature(feature, layer) {
+	 function onEachContour(feature, layer) {
 	     layer.on({
 		 mouseover: highlightFeature,
+		 mouseout: resetHighlight,
+		 click: zoomToFeature
+	     });
+	 }
+
+	 function mouseSiteMarker(feature, layer) {
+	     feature.on({
+		 mouseover: highlightSiteMarker,
 		 mouseout: resetHighlight,
 		 click: zoomToFeature
 	     });
@@ -248,7 +272,7 @@
 
 	 /* pm_layer = L.topoJson(json2, {
 	    style: style,
-	    onEachFeature: onEachFeature,
+	    onEachFeature: onEachContour,
 	    smoothFactor: 0
 	    }).addTo(map);*/
 	 function chooseData(time, level) {
@@ -284,13 +308,13 @@
 		     if (topojson) {
 			 pm_layer = L.topoJson(gjson, {
 			     style: style,
-			     onEachFeature: onEachFeature,
+			     onEachFeature: onEachContour,
 			     smoothFactor: .1
 			 }).addTo(map);
 		     } else {
 			 pm_layer = L.geoJson(gjson.features, {
 			     style: style,
-			     onEachFeature: onEachFeature,
+			     onEachFeature: onEachContour,
 			     /* might need to be lowered due to inconsistent simplified contours */
 			     smoothFactor: 1
 			 }).addTo(map);
@@ -332,7 +356,7 @@
 		 labels.push(
 		     '<i style="background:' + getColor(from) + '"></i> <b>' +
 		     '10<sup>' + from + '</sup>' +
-												    (i + 1 < grades.length ? '&ndash;10<sup>' + to + '</sup>' : '+') + '</b> ng/m<sup>3</sup>');
+													   (i + 1 < grades.length ? '&ndash;10<sup>' + to + '</sup>' : '+') + '</b> ng/m<sup>3</sup>');
 	     }
 	     div.innerHTML = legend_title + labels.join('<br>');
 	     return div;
@@ -358,33 +382,6 @@
 					  syncSlider: true });
 	 level_slider.addTo(map);
 
-	 /* 'store' locator */
-	 var site_map;
-	 var locator = L.control({position: 'topright'});
-	 locator.onAdd = function (map) {
-	     var div = L.DomUtil.create('div', 'info');
-	     var site_div = document.createElement("div");
-	     site_div.id = 'locator';
-	     div.appendChild(site_div);
-	     /* var legend_title = '<h4>PM Levels</h4>'
-		for (var i = grades.length - 1; i >= 0; i--) {
-		from = grades[i];
-		to = grades[i + 1];
-		labels.push(
-		'<i style="background:' + getColor(from) + '"></i> <b>' +
-		'10<sup>' + from + '</sup>' +
-		(i + 1 < grades.length ? '&ndash;10<sup>' + to + '</sup>' : '+') + '</b> ng/m<sup>3</sup>');
-		}
-		div.innerHTML = legend_title + labels.join('<br>');*/
-	     return div;
-	 };
-	 locator.addTo(map);
-	 site_map = L.map('locator', {attributionControl: false}).setView([43, -76], 6);
-	 L.tileLayer('https://api.tiles.mapbox.com/v4/{id}/{z}/{x}/{y}.png?access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw', {
-	     maxZoom: 18,
-	     id: 'mapbox.streets'
-	 }).addTo(site_map);
-
 	 // control that shows state info on hover
 	 var info = L.control();
 	 info.onAdd = function (map) {
@@ -406,12 +403,17 @@
 	 var cm_options;
 	 var cm_red_options;
 	 var cm_orig_options;
-	 cm_options = {radius: 7, color: '#333',
-		       weight: 2, opacity: .6};
-	 cm_red_options = {radius: 7, color: 'red',
-			   weight: 2, opacity: .6};
-	 cm_orig_options1 = {radius: 5, color: '#ff9000',
-			     weight: 2, fillOpacity: .6};
+	 /* cm_options = {radius: 7, color: '#333',
+	    weight: 2, opacity: .6};*/
+	 cm_options = {radius: 2, color: '#333',
+		       weight: 9, opacity: .1,
+		       fillOpacity: .8,
+		       riseOnHover: true,
+		       zIndexOffset: 100000};
+	 /* cm_red_options = {radius: 7, color: 'red',
+	    weight: 2, opacity: .6};*/
+	 cm_orig_options = {radius: 5, color: '#ff9000',
+			    weight: 2, fillOpacity: .6};
 	 /* var circle_markers = [];*/
 	 var origin_circle;
 	 $.get('data/nysm.csv', function(csv) {
@@ -421,13 +423,13 @@
 		 var lon = parseFloat(site['lon [degrees]']);
 		 var this_marker;
 		 if (site['stid'] == 'BUFF') {
-		     this_marker = L.circleMarker([lat, lon], cm_red_options);
-		     origin_circle1 = L.circleMarker([lat, lon], cm_orig_options1);
-		     origin_circle1.addTo(map);
+		     this_marker = L.circleMarker([lat, lon], cm_orig_options);
 		 } else {
 		     this_marker = L.circleMarker([lat, lon], cm_options);
 		 }
-		 sites[i]['marker'] = this_marker.addTo(site_map);
+		 this_marker.on('mouseover', highlightSiteMarker);
+		 this_marker.on('mouseout', resetSiteMarker);
+		 sites[i]['marker'] = this_marker.addTo(map);
 	     });
 	 }, 'text');
 	</script>
