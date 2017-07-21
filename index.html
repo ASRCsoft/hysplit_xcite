@@ -39,6 +39,9 @@
 	     border-radius: 5px;
 	     margin: 10px;
 	 }
+	 #simulation_info {
+	     width: 300px;
+	 }
 	 .info h4 {
 	     margin: 0 0 5px;
 	     color: #777;
@@ -204,6 +207,7 @@
 		    '#000080';
 	 }
 
+	 /* contour functions */
 	 function style(feature) {
 	     return {
 		 weight: 0,
@@ -216,32 +220,10 @@
 
 	 function highlightFeature(e) {
 	     var layer = e.target;
-
 	     layer.setStyle({
 		 weight: 2
 	     });
-
-	     if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
-		 layer.bringToFront();
-	     }
-
-	     info.update(layer.feature.properties);
-	 }
-
-	 function highlightSiteMarker(e) {
-	     var marker = e.target;
-	     marker.setStyle({
-		 opacity: .6
-	     });
-	     if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
-		 layer.bringToFront();
-	     }
-	     info.update(marker.feature.properties);
-	 }
-
-	 function resetHighlight(e) {
-	     pm_layer.resetStyle(e.target);
-	     info.update();
+	     info.update(layer.feature.properties.level_name);
 	 }
 
 	 function resetHighlight(e) {
@@ -261,11 +243,34 @@
 	     });
 	 }
 
+	 /* site marker functions */
+	 function highlightSiteMarker(e) {
+	     var marker = e.target;
+	     marker.setStyle({
+		 opacity: .6,
+		 radius: 8,
+		 weight: 2,
+		 fillOpacity: .4
+	     });
+	     info.update('Site ' + marker['site_name']);
+	 }
+
+	 function resetSiteMarker(e) {
+	     sites_layer.resetStyle(e.target);
+	     info.update();
+	 }
+
+	 function makeSelected(e) {
+	     /* this one's orange now, the other one's not */
+	     sites_layer.resetStyle(e.target);
+	     info.update();
+	 }
+	 
 	 function mouseSiteMarker(feature, layer) {
 	     feature.on({
 		 mouseover: highlightSiteMarker,
 		 mouseout: resetHighlight,
-		 click: zoomToFeature
+		 click: makeSelected
 	     });
 	 }
 	 
@@ -293,6 +298,7 @@
 		     map.removeLayer(pm_layer);
 		 } catch(err) {}
 		 pm_layer = geoms[time][level].addTo(map);
+		 pm_layer.bringToBack();
 	     } else {
 		 if (topojson) {
 		     folder = 'data/topojson/';
@@ -320,8 +326,10 @@
 			 }).addTo(map);
 		     }
 		     geoms[time][level] = pm_layer;
+		     pm_layer.bringToBack();
 		 });
 	     }
+
 	 }
 
 	 function changeTime(t) {
@@ -355,12 +363,9 @@
 		 to = grades[i + 1];
 		 labels.push(
 		     '<i style="background:' + getColor(from) + '"></i> <b>' +
-		     '10<sup>' + from + '</sup>' +
-<<<<<<< HEAD
-													   (i + 1 < grades.length ? '&ndash;10<sup>' + to + '</sup>' : '+') + '</b> ng/m<sup>3</sup>');
-=======
-													 (i + 1 < grades.length ? '&ndash;10<sup>' + to + '</sup>' : '+') + '</b> ng/m<sup>3</sup>');
->>>>>>> master
+		     '10<sup>' + from +
+		     '</sup>' + (i + 1 < grades.length ? '&ndash;10<sup>' + to + '</sup>' : '+') +
+		     '</b> ng/m<sup>3</sup>');
 	     }
 	     div.innerHTML = legend_title + labels.join('<br>');
 	     return div;
@@ -390,13 +395,14 @@
 	 var info = L.control();
 	 info.onAdd = function (map) {
 	     this._div = L.DomUtil.create('div', 'info');
+	     this._div.id = 'simulation_info';
 	     this.update();
 	     return this._div;
 	 };
 	 info.update = function (props) {
 	     this._div.innerHTML = '<h4>PM Levels</h4>' + (props ?
-							   props.level_name
-							 : 'Hover over a contour');
+							   props
+							 : 'Hover over an object');
 	 };
 	 info.addTo(map);
 
@@ -428,20 +434,24 @@
 		 var lat = parseFloat(site['lat [degrees]']);
 		 var lon = parseFloat(site['lon [degrees]']);
 		 var this_marker;
+		 var this_options;
+		 
 		 if (site['stid'] == 'BUFF') {
-		     this_marker = L.circleMarker([lat, lon], cm_orig_options);
+		     this_options = cm_orig_options;
 		 } else {
-		     this_marker = L.circleMarker([lat, lon], cm_options);
+		     this_options = cm_options;
 		 }
-<<<<<<< HEAD
+		 /* this_options['site_name'] = site['stid'];*/
+		 this_marker = L.circleMarker([lat, lon], this_options);
+		 this_marker['site_name'] = site['stid'];
 		 this_marker.on('mouseover', highlightSiteMarker);
-		 this_marker.on('mouseout', resetSiteMarker);
-		 sites[i]['marker'] = this_marker.addTo(map);
-=======
+		 this_marker.on('mouseout', function (e) {
+		     this.setStyle(this_options);
+		     info.update();
+		 }, this_marker);
 		 sites_layer.addLayer(this_marker);
->>>>>>> master
 	     });
-	     sites_layer.addTo(site_map);
+	     sites_layer.addTo(map);
 	 }, 'text');
 	</script>
     </body>
