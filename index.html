@@ -356,7 +356,11 @@
 		 labels.push(
 		     '<i style="background:' + getColor(from) + '"></i> <b>' +
 		     '10<sup>' + from + '</sup>' +
+<<<<<<< HEAD
 													   (i + 1 < grades.length ? '&ndash;10<sup>' + to + '</sup>' : '+') + '</b> ng/m<sup>3</sup>');
+=======
+													 (i + 1 < grades.length ? '&ndash;10<sup>' + to + '</sup>' : '+') + '</b> ng/m<sup>3</sup>');
+>>>>>>> master
 	     }
 	     div.innerHTML = legend_title + labels.join('<br>');
 	     return div;
@@ -416,7 +420,9 @@
 			    weight: 2, fillOpacity: .6};
 	 /* var circle_markers = [];*/
 	 var origin_circle;
+	 var sites_layer;
 	 $.get('data/nysm.csv', function(csv) {
+	     sites_layer = L.featureGroup();
 	     sites = $.csv.toObjects(csv);
 	     $.each(sites, function(i, site) {
 		 var lat = parseFloat(site['lat [degrees]']);
@@ -427,10 +433,15 @@
 		 } else {
 		     this_marker = L.circleMarker([lat, lon], cm_options);
 		 }
+<<<<<<< HEAD
 		 this_marker.on('mouseover', highlightSiteMarker);
 		 this_marker.on('mouseout', resetSiteMarker);
 		 sites[i]['marker'] = this_marker.addTo(map);
+=======
+		 sites_layer.addLayer(this_marker);
+>>>>>>> master
 	     });
+	     sites_layer.addTo(site_map);
 	 }, 'text');
 	</script>
     </body>
