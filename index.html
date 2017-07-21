@@ -1,0 +1,436 @@
+<html>
+    <head>
+	<title>HYSPLIT - xCITE Data Lab</title>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<!-- leaflet stuff -->
+	<link rel="stylesheet" href="https://unpkg.com/leaflet@1.1.0/dist/leaflet.css" integrity="sha512-wcw6ts8Anuw10Mzh9Ytw4pylW8+NAD4ch3lqm9lzAsTxg0GFeJgoAtxuCLREZSC5lUXdVyo/7yfsqFjQ4S+aKw==" crossorigin="">
+	<!-- <script src="https://unpkg.com/leaflet@1.1.0/dist/leaflet.js" integrity="sha512-mNqn2Wg7tSToJhvHcqfzLMU6J4mkOImSPTxVZAdo+lcPlk+GhZmYgACEe0x35K7YzW1zJ7XyJV/TT1MrdXvMcA==" crossorigin=""></script> -->
+	<script src="js/Leaflet/dist/leaflet-src.js"></script>
+	<!-- topojson stuff -->
+	<script src="https://unpkg.com/topojson@3"></script>
+	<!-- jquery stuff -->
+	<script src="https://code.jquery.com/jquery-3.2.1.min.js"></script>
+	<!-- slider stuff -->
+	<script src="js/leaflet-slider.js"></script>
+	<link rel="stylesheet" href="css/leaflet-slider.css">
+	<!-- read csv files -->
+	<script src="js/jquery.csv.min.js"></script>
+	<style>
+	 #map {
+	     width: 100%;
+	     height: 100%;
+	     min-height: 650px;
+	 }
+	 #locator {
+	     width: 350px;
+	     height: 350px;
+	     z-index: 0;
+	     border-radius: 2px;
+	 }
+	 .leaflet-top.leaflet-right .leaflet-control {
+	     clear: none;
+	 }
+	 .info {
+	     padding: 6px 8px;
+	     font: 14px/16px Arial, Helvetica, sans-serif;
+	     background: white;
+	     background: rgba(255,255,255,0.8);
+	     box-shadow: 0 0 15px rgba(0,0,0,0.2);
+	     border-radius: 5px;
+	     margin: 10px;
+	 }
+	 .info h4 {
+	     margin: 0 0 5px;
+	     color: #777;
+	 }
+	 .legend {
+	     text-align: left;
+	     line-height: 18px;
+	     color: #555;
+	 }
+	 .legend i {
+	     width: 18px;
+	     height: 18px;
+	     float: left;
+	     margin-right: 8px;
+	     opacity: 0.7;
+	 }
+	</style>
+    </head>
+    <body>
+	<div id="map"></div>
+	<script>
+	 /*
+	    First run npm install topojson --save and then link "node_modules/topojson/build/topojson.min.js" 
+	    above this snippet in your html.
+	    Usage: http://leafletjs.com/reference.html#geojson
+	  */
+
+	 L.TopoJSON = L.GeoJSON.extend({
+	     /* first simplify the topojson, then remove the
+		simplification from the options */
+
+	     /* work on this later! */
+	     not_working_yet_initialize: function (json, options) {
+		 if ($.inArray('smoothFactor', Object.keys(options)) == -1) {
+		     options['smoothFactor'] = 0;
+		 }
+		 /* hmm, not terrible but needs work */
+		 /* presimp_topojson = topojson.presimplify(json);
+		    simp_topojson = topojson.simplify(presimp_topojson, options['smoothFactor']);*/
+		 /* instead */
+		 function make_point(p) {
+		     return L.point(p[0], p[1], false);
+		 }
+		 function make_array(p) {
+		     return [p.x, p.y];
+		 }
+		 json2 = json;
+		 $.each(json.arcs, function (i) {
+		     dummy_object = {type: 'LineString', arcs: [[i]]};
+		     geojson = topojson.feature(json, dummy_object);
+		     points = geojson.geometry.coordinates.map(make_point);
+		     simp_points = L.LineUtil.simplify(points, options['smoothFactor']);
+		     json2.arcs[i] = simp_points.map(make_array);
+		 });
+		 /* the data is all in non-transformed format now */
+		 delete json2['transform']
+
+		 /* end of needs work zone */
+		 options['smoothFactor'] = 0;
+		 L.Util.setOptions(this, options);
+
+		 this._layers = {};
+
+		 if (json2) {
+		     this.addData(json2);
+		 }
+	     },
+	     /* going to add more here to enable topologically correct
+		polygon simplification */
+
+	     /* 1) simplify topojson arcs */
+	     /* 1a) turn topojson arcs into geojson linestrings */
+	     /* 1b) create polylines for each linestring (simplified
+		automatically) */
+	     /* 1c) get a copy of the original topojson */
+	     /* 1d) replace topojson arcs with simplified arcs from
+		polylines */
+
+	     /* 2) rewrite geojson initialize function to send
+		simplified topojson to addData */
+
+	     /* 3) I'm done? I'm done! */
+	     addData: function (data) {
+		 var geojson, key;
+		 if (data.type === "Topology") {
+		     for (key in data.objects) {
+			 if (data.objects.hasOwnProperty(key)) {
+			     geojson = topojson.feature(data, data.objects[key]);
+			     L.GeoJSON.prototype.addData.call(this, geojson);
+			 }
+		     }
+		     return this;
+		 }
+
+		 L.GeoJSON.prototype.addData.call(this, data);
+
+		 return this;
+	     }
+	 });
+
+	 L.topoJson = function (data, options) {
+	     return new L.TopoJSON(data, options);
+	 };
+
+	 /* 
+	    The MIT License (MIT)
+	    Copyright (c) 2016 Brendan Vinson
+	    Permission is hereby granted, free of charge, to any person obtaining a copy
+	    of this software and associated documentation files (the "Software"), to deal
+	    in the Software without restriction, including without limitation the rights
+	    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+	    copies of the Software, and to permit persons to whom the Software is
+	    furnished to do so, subject to the following conditions:
+	    The above copyright notice and this permission notice shall be included in
+	    all copies or substantial portions of the Software.
+	    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+	    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+	    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+	    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+	    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+	    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+	    THE SOFTWARE.
+	  */
+	</script>
+	<script type="text/javascript">
+
+	 /* useful global variables */
+	 
+	 /* currently selected time */
+	 var time = '0:00';
+	 /* currently selected level (height) */
+	 var level = 0;
+	 /* contour levels */
+	 var levels = [-2, -1, 0, 1, 2, 3, 4, 5];
+	 /* object containing contour geometries (for caching) */
+	 var geoms = {};
+	 /* currently displayed contours */
+	 var pm_layer;
+	 var json;
+	 /* autoplay function */
+	 var autoplay;
+	 
+
+	 var map = L.map('map').setView([43, -73], 6);
+
+	 L.tileLayer('https://api.tiles.mapbox.com/v4/{id}/{z}/{x}/{y}.png?access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw', {
+	     maxZoom: 18,
+	     attribution: 'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors, ' +
+			  '<a href="http://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, ' +
+			  'Imagery © <a href="http://mapbox.com">Mapbox</a>',
+	     id: 'mapbox.light'
+	 }).addTo(map);
+
+	 // get color depending on population density value
+	 function getColor(d) {
+	     return d >= 5  ? '#800000' :
+		    d >= 4  ? '#ff3200' :
+		    d >= 3  ? '#ffb900' :
+		    d >= 2  ? '#b6ff41' :
+		    d >= 1  ? '#41ffb6' :
+		    d >= 0  ? '#00a4ff' :
+		    d >= -1 ? '#0012ff' :
+		    '#000080';
+	 }
+
+	 function style(feature) {
+	     return {
+		 weight: 0,
+		 opacity: 1,
+		 color: 'white',
+		 fillOpacity: 0.5,
+		 fillColor: getColor(feature.properties.level)
+	     };
+	 }
+
+	 function highlightFeature(e) {
+	     var layer = e.target;
+
+	     layer.setStyle({
+		 weight: 2
+	     });
+
+	     if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
+		 layer.bringToFront();
+	     }
+
+	     info.update(layer.feature.properties);
+	 }
+
+	 function resetHighlight(e) {
+	     pm_layer.resetStyle(e.target);
+	     info.update();
+	 }
+
+	 function zoomToFeature(e) {
+	     map.fitBounds(e.target.getBounds());
+	 }
+
+	 function onEachFeature(feature, layer) {
+	     layer.on({
+		 mouseover: highlightFeature,
+		 mouseout: resetHighlight,
+		 click: zoomToFeature
+	     });
+	 }
+	 
+
+	 /* pm_layer = L.topoJson(json2, {
+	    style: style,
+	    onEachFeature: onEachFeature,
+	    smoothFactor: 0
+	    }).addTo(map);*/
+	 function chooseData(time, level) {
+	     /* use topojson? */
+	     var topojson = true;
+	     
+	     /* see if we can get cached data */
+	     var cached = true;
+	     if ($.inArray(time, Object.keys(geoms)) == -1) {
+		 geoms[time] = {};
+	     }
+	     if ($.inArray(level, Object.keys(geoms[time])) == -1) {
+		 cached = false;
+	     }
+
+	     if (cached) {
+		 try {
+		     map.removeLayer(pm_layer);
+		 } catch(err) {}
+		 pm_layer = geoms[time][level].addTo(map);
+	     } else {
+		 if (topojson) {
+		     folder = 'data/topojson/';
+		 } else {
+		     folder = 'data/geojson/';
+		 }
+		 file_path = folder + 'level' + level + '_time' + time + '.json';
+		 $.getJSON(file_path, function(gjson) {
+		     json = gjson;
+		     try {
+			 map.removeLayer(pm_layer);
+		     } catch(err) {}
+		     if (topojson) {
+			 pm_layer = L.topoJson(gjson, {
+			     style: style,
+			     onEachFeature: onEachFeature,
+			     smoothFactor: .1
+			 }).addTo(map);
+		     } else {
+			 pm_layer = L.geoJson(gjson.features, {
+			     style: style,
+			     onEachFeature: onEachFeature,
+			     /* might need to be lowered due to inconsistent simplified contours */
+			     smoothFactor: 1
+			 }).addTo(map);
+		     }
+		     geoms[time][level] = pm_layer;
+		 });
+	     }
+	 }
+
+	 function changeTime(t) {
+	     time = t + ':00';
+	     chooseData(time, level);
+	 }
+	 function changeLevel(l) {
+	     level = l;
+	     chooseData(time, level);
+	 }
+	 function displayNextTime() {
+	     var current_hour = parseInt(time.substring(0, 2));
+	     var next_hour = current_hour + 1;
+	     if (next_hour == 24) {
+		 next_hour = 1;
+	     }
+	     changeTime(next_hour);
+	 }
+	 /* autoplay = setInterval(displayNextTime, 350);*/
+
+	 var legend = L.control({position: 'bottomright'});
+	 legend.onAdd = function (map) {
+	     var div = L.DomUtil.create('div', 'info legend'),
+		 /* grades = [0, 10, 20, 50, 100, 200, 500, 1000],*/
+	     grades = levels,
+		 labels = [],
+		 from, to;
+	     var legend_title = '<h4>PM Levels</h4>'
+	     for (var i = grades.length - 1; i >= 0; i--) {
+		 from = grades[i];
+		 to = grades[i + 1];
+		 labels.push(
+		     '<i style="background:' + getColor(from) + '"></i> <b>' +
+		     '10<sup>' + from + '</sup>' +
+												    (i + 1 < grades.length ? '&ndash;10<sup>' + to + '</sup>' : '+') + '</b> ng/m<sup>3</sup>');
+	     }
+	     div.innerHTML = legend_title + labels.join('<br>');
+	     return div;
+	 };
+	 legend.addTo(map);
+
+
+	 /* slider stuff */
+	 time_slider = L.control.slider(function(t) {changeTime(t);},
+					{id: 'time_slider', orientation: 'horizontal',
+					 title: 'Select Hour',
+					 value: 1, min: 1, max: 23, position: 'bottomleft',
+					 logo: 'Time', size: '400px', collapsed: false,
+					 getValue: function(time) {return time + ':00';},
+					 syncSlider: true });
+	 time_slider.addTo(map);
+	 level_slider = L.control.slider(function(l) {changeLevel(l);},
+					 {id: 'level_slider', orientation: 'vertical',
+					  title: 'Select Level',
+					  value: 0, max: 300, step: 150, position: 'bottomleft',
+					  logo: 'Level', size: '100px', collapsed: false,
+					  getValue: function(time) {return time + 'm';},
+					  syncSlider: true });
+	 level_slider.addTo(map);
+
+	 /* 'store' locator */
+	 var site_map;
+	 var locator = L.control({position: 'topright'});
+	 locator.onAdd = function (map) {
+	     var div = L.DomUtil.create('div', 'info');
+	     var site_div = document.createElement("div");
+	     site_div.id = 'locator';
+	     div.appendChild(site_div);
+	     /* var legend_title = '<h4>PM Levels</h4>'
+		for (var i = grades.length - 1; i >= 0; i--) {
+		from = grades[i];
+		to = grades[i + 1];
+		labels.push(
+		'<i style="background:' + getColor(from) + '"></i> <b>' +
+		'10<sup>' + from + '</sup>' +
+		(i + 1 < grades.length ? '&ndash;10<sup>' + to + '</sup>' : '+') + '</b> ng/m<sup>3</sup>');
+		}
+		div.innerHTML = legend_title + labels.join('<br>');*/
+	     return div;
+	 };
+	 locator.addTo(map);
+	 site_map = L.map('locator', {attributionControl: false}).setView([43, -76], 6);
+	 L.tileLayer('https://api.tiles.mapbox.com/v4/{id}/{z}/{x}/{y}.png?access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw', {
+	     maxZoom: 18,
+	     id: 'mapbox.streets'
+	 }).addTo(site_map);
+
+	 // control that shows state info on hover
+	 var info = L.control();
+	 info.onAdd = function (map) {
+	     this._div = L.DomUtil.create('div', 'info');
+	     this.update();
+	     return this._div;
+	 };
+	 info.update = function (props) {
+	     this._div.innerHTML = '<h4>PM Levels</h4>' + (props ?
+							   props.level_name
+							 : 'Hover over a contour');
+	 };
+	 info.addTo(map);
+
+	 /* get the site locations */
+	 /* using https://github.com/evanplaice/jquery-csv/ */
+	 var sites;
+	 /* circleMarker options */
+	 var cm_options;
+	 var cm_red_options;
+	 var cm_orig_options;
+	 cm_options = {radius: 7, color: '#333',
+		       weight: 2, opacity: .6};
+	 cm_red_options = {radius: 7, color: 'red',
+			   weight: 2, opacity: .6};
+	 cm_orig_options1 = {radius: 5, color: '#ff9000',
+			     weight: 2, fillOpacity: .6};
+	 /* var circle_markers = [];*/
+	 var origin_circle;
+	 $.get('data/nysm.csv', function(csv) {
+	     sites = $.csv.toObjects(csv);
+	     $.each(sites, function(i, site) {
+		 var lat = parseFloat(site['lat [degrees]']);
+		 var lon = parseFloat(site['lon [degrees]']);
+		 var this_marker;
+		 if (site['stid'] == 'BUFF') {
+		     this_marker = L.circleMarker([lat, lon], cm_red_options);
+		     origin_circle1 = L.circleMarker([lat, lon], cm_orig_options1);
+		     origin_circle1.addTo(map);
+		 } else {
+		     this_marker = L.circleMarker([lat, lon], cm_options);
+		 }
+		 sites[i]['marker'] = this_marker.addTo(site_map);
+	     });
+	 }, 'text');
+	</script>
+    </body>
+</html>
