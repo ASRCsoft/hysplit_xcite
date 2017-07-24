@@ -247,10 +247,22 @@
 	 function highlightSiteMarker(e) {
 	     var marker = e.target;
 	     marker.setStyle({
-		 opacity: .6,
-		 radius: 8,
+		 /* opacity: .6,*/
+		 fillColor: '#6666ff',
+		 radius: 7,
+		 weight: 2
+		 /* fillOpacity: .4*/
+	     });
+	     info.update('Site ' + marker['site_name']);
+	 }
+
+	 function highlightOrigMarker(e) {
+	     var marker = e.target;
+	     marker.setStyle({
+		 /* opacity: .6,*/
+		 radius: 7,
 		 weight: 2,
-		 fillOpacity: .4
+		 fillOpacity: 1
 	     });
 	     info.update('Site ' + marker['site_name']);
 	 }
@@ -415,9 +427,15 @@
 	 var cm_orig_options;
 	 /* cm_options = {radius: 7, color: '#333',
 	    weight: 2, opacity: .6};*/
-	 cm_options = {radius: 2, color: '#333',
-		       weight: 9, opacity: .1,
-		       fillOpacity: .8,
+	 /* cm_options = {radius: 2, color: '#333',
+	    weight: 9, opacity: .1,
+	    fillOpacity: .8,
+	    riseOnHover: true,
+	    zIndexOffset: 100000};*/
+	 cm_options = {radius: 4, color: '#6666ff',
+		       fillColor: '#000',
+		       weight: 2, opacity: 1,
+		       fillOpacity: 1,
 		       riseOnHover: true,
 		       zIndexOffset: 100000};
 	 /* cm_red_options = {radius: 7, color: 'red',
@@ -438,13 +456,15 @@
 		 
 		 if (site['stid'] == 'BUFF') {
 		     this_options = cm_orig_options;
+		     highlight = highlightOrigMarker;
 		 } else {
 		     this_options = cm_options;
+		     highlight = highlightSiteMarker;
 		 }
 		 /* this_options['site_name'] = site['stid'];*/
 		 this_marker = L.circleMarker([lat, lon], this_options);
 		 this_marker['site_name'] = site['stid'];
-		 this_marker.on('mouseover', highlightSiteMarker);
+		 this_marker.on('mouseover', highlight);
 		 this_marker.on('mouseout', function (e) {
 		     this.setStyle(this_options);
 		     info.update();
