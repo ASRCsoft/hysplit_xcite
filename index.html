@@ -170,18 +170,20 @@
 	 /* useful global variables */
 	 
 	 /* currently selected time */
-	 var time = '0:00';
+	 var times = [];
+	 var time = '1:00'; // change this soon!
 	 /* currently selected level (height) */
-	 var level = 0;
+	 var heights = [];
+	 var height;
+	 var level = 0; // change this soon!
 	 /* contour levels */
 	 var levels = [-2, -1, 0, 1, 2, 3, 4, 5];
 	 /* object containing contour geometries (for caching) */
 	 var geoms = {};
 	 /* currently displayed contours */
 	 var pm_layer;
-	 var json;
-	 /* autoplay function */
-	 var autoplay;
+	 /* data about the current model (heights, levels, etc.) */
+	 var meta;
 	 
 
 	 var map = L.map('map').setView([43, -74.5], 7);
@@ -261,6 +263,16 @@
 	     });
 	     site_info.update(marker['site_name']);
 	 }
+
+
+	 /* get data about the simulation */
+	 /* I should write a function that organizes the geojson, and
+	 call that function here, using this to set up the simulation
+	 info */	 
+	 $.get('data/topojson/meta.json', function(json) {
+	     times = json['times'];
+	     levels = json['levels'];
+	 });
 	 
 
 	 /* pm_layer = L.topoJson(json2, {
@@ -354,7 +366,7 @@
 		 labels.push(
 		     '<span id="ng' + from + '"><i style="background:' + getColor(from) + '"></i> <b>' +
 		     '10<sup>' + from + '</sup>' +
-																			 (i + 1 < grades.length ? '&ndash;10<sup>' + to + '</sup>' : '+') + '</b> ng/m<sup>3</sup></span>');
+																			    (i + 1 < grades.length ? '&ndash;10<sup>' + to + '</sup>' : '+') + '</b> ng/m<sup>3</sup></span>');
 	     }
 	     div.innerHTML = legend_title + labels.join('<br>');
 	     return div;
