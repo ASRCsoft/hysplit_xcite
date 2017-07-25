@@ -354,7 +354,7 @@
 		 labels.push(
 		     '<span id="ng' + from + '"><i style="background:' + getColor(from) + '"></i> <b>' +
 		     '10<sup>' + from + '</sup>' +
-																     (i + 1 < grades.length ? '&ndash;10<sup>' + to + '</sup>' : '+') + '</b> ng/m<sup>3</sup></span>');
+																			 (i + 1 < grades.length ? '&ndash;10<sup>' + to + '</sup>' : '+') + '</b> ng/m<sup>3</sup></span>');
 	     }
 	     div.innerHTML = legend_title + labels.join('<br>');
 	     return div;
@@ -472,7 +472,7 @@
 	     sites_layer.addTo(site_map);
 	 }, 'text');
 
-	 /* control that shows object info on hover */
+	 /* site info box in the site locator map */
 	 var site_info = L.control({position: 'topleft'});
 	 site_info.onAdd = function (map) {
 	     this._div = L.DomUtil.create('div', 'info');
@@ -483,7 +483,37 @@
 	     this._div.innerHTML = '<h4>Current Site: BUFF</h4>Switch to: ' + (props ? props : '');
 	 };
 	 site_info.addTo(site_map);
-	 /* site_zoom = L.control.zoom().addTo(site_map);*/
+
+	 /* simulation info box */
+	 var sim_info = L.control({position: 'topright'});
+	 sim_info.onAdd = function (map) {
+	     this._div = L.DomUtil.create('div', 'info');
+	     this.update();
+	     return this._div;
+	 };
+	 sim_info.update = function (props) {
+	     var custom_form;
+	     this._div.innerHTML = '<h4>Simulation Info:</h4>' +
+				   '<p>Release site: BUFF<br>' +
+				   'Release time: 10am<br>' +
+				   'More info about things, etc.</p>';
+	     run_hysplit = function() {
+		 var form = $("#hysplit");
+		 var lat = form.find('input[name="lat"]').val();
+		 var lon = form.find('input[name="lon"]').val();
+		 /* Send the data using post with element id name and name2*/
+		 var url = 'http://appsvr.asrc.cestm.albany.edu:5000?lat=' + lat + '&lon=' + lon;
+		 $.post(url, callback=function(text) {
+		     form.append('<p>Flask says:<br>' + text + '</p>');
+		 });
+	     };
+	     custom_form = '<form id="hysplit" onSubmit="run_hysplit(); return false;">' +
+			   'Latitude: <input type="text" name="lat"><br>' +
+			   'Longitude: <input type="text" name="lon"><br>' +
+			   '<input type="submit" value="Click me to run the model"></form>';
+	     this._div.innerHTML += '<h4>Custom Simulation:</h4>' + custom_form;
+	 };
+	 sim_info.addTo(map);
 	</script>
     </body>
 </html>
