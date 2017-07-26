@@ -175,7 +175,7 @@
 	 /* currently selected level (height) */
 	 var heights = [];
 	 var height;
-	 var level = 0; // change this soon!
+	 var height = 0; // change this soon!
 	 var site = 'BUFF'; // current site
 	 var fwd = true; // boolean value: forward or backward?
 	 /* contour levels */
@@ -226,7 +226,7 @@
 		 labels.push(
 		     '<span id="ng' + from + '"><i style="background:' + getColor(from) + '"></i> <b>' +
 		     '10<sup>' + from + '</sup>' +
-																						 (i + 1 < grades.length ? '&ndash;10<sup>' + to + '</sup>' : '+') + '</b> ng/m<sup>3</sup></span>');
+																						    (i + 1 < grades.length ? '&ndash;10<sup>' + to + '</sup>' : '+') + '</b> ng/m<sup>3</sup></span>');
 	     }
 	     div.innerHTML = legend_title + labels.join('<br>');
 	     return div;
@@ -372,16 +372,16 @@
 	 }
 
 	 /* change displayed data */
-	 function chooseData(time, level, fwd) {
+	 function chooseData(time, height, fwd) {
 	     /* use topojson? */
 	     var topojson = true;
 	     
 	     /* see if we can get cached data */
 	     var cached = true;
-	     /* need to get time and level indices as opposed to
+	     /* need to get time and height indices as opposed to
 		values */
 	     var which_time = $.inArray(time, times);
-	     var which_level = $.inArray(level, levels);
+	     var which_height = $.inArray(height, heights);
 	     if ($.inArray(site, Object.keys(geoms)) == -1) {
 		 geoms[site] = {};
 	     }
@@ -389,7 +389,7 @@
 	     if ($.inArray(which_time, Object.keys(site_geoms)) == -1) {
 		 site_geoms[which_time] = {};
 	     }
-	     if ($.inArray(which_level, Object.keys(site_geoms[which_time])) == -1) {
+	     if ($.inArray(which_height, Object.keys(site_geoms[which_time])) == -1) {
 		 cached = false;
 	     }
 
@@ -397,7 +397,7 @@
 		 try {
 		     map.removeLayer(pm_layer);
 		 } catch(err) {}
-		 pm_layer = site_geoms[which_time][which_level].addTo(map);
+		 pm_layer = site_geoms[which_time][which_height].addTo(map);
 	     } else {
 		 if (fwd) {
 		     fwd_folder = 'fwd/';
@@ -405,7 +405,7 @@
 		     fwd_folder = 'bck/';
 		 }
 		 folder = 'data/' + site + '/' + fwd_folder;
-		 file_path = folder + 'level' + which_level + '_time' + which_time + '.json';
+		 file_path = folder + 'height' + which_height + '_time' + which_time + '.json';
 		 $.getJSON(file_path, function(gjson) {
 		     json = gjson;
 		     try {
@@ -430,21 +430,21 @@
 			tooltip = L.tooltip(tooltip_options, pm_layer);*/
 		     /* tooltip.setTooltipContent(pm_layer.feature.properties.level);*/
 		     /* pm_layer.bindTooltip(tooltip);*/
-		     geoms[site][which_time][which_level] = pm_layer;
+		     geoms[site][which_time][which_height] = pm_layer;
 		 });
 	     }
 	 };
 
 	 function changeTime(t) {
 	     time = times[t];
-	     chooseData(time, level, fwd);
+	     chooseData(time, height, fwd);
 	 };
-	 function changeLevel(l) {
-	     level = levels[l];
-	     chooseData(time, level, fwd);
+	 function changeHeight(l) {
+	     height = heights[l];
+	     chooseData(time, height, fwd);
 	 };
 	 function changeFwd(fwd) {
-	     chooseData(time, level, fwd);
+	     chooseData(time, height, fwd);
 	 };
 	 function displayNextTime() {
 	     var which_time = $.inArray(time, times);
@@ -466,31 +466,31 @@
 					     syncSlider: true });
 	     time_slider.addTo(map);
 	 };
-	 create_levels_slider = function(levels, map) {
-	     level_slider = L.control.slider(function(l) {changeLevel(l);},
-					     {id: 'level_slider', orientation: 'vertical',
-					      title: 'Select Level', value: 0,
-					      max: levels.length - 1, position: 'bottomleft',
-					      logo: 'Level', size: '100px', collapsed: false,
-					      getValue: function(level) {return levels[level] + 'm';},
-					      syncSlider: true });
-	     level_slider.addTo(map);
+	 create_heights_slider = function(heights, map) {
+	     height_slider = L.control.slider(function(l) {changeHeight(l);},
+					      {id: 'height_slider', orientation: 'vertical',
+					       title: 'Select Height', value: 0,
+					       max: heights.length - 1, position: 'bottomleft',
+					       logo: 'Height', size: '100px', collapsed: false,
+					       getValue: function(height) {return heights[height] + 'm';},
+					       syncSlider: true });
+	     height_slider.addTo(map);
 	 };
-	 create_sliders = function(levels, times, map) {
+	 create_sliders = function(heights, times, map) {
 	     create_time_slider(times, map);
-	     create_levels_slider(levels, map);
+	     create_heights_slider(heights, map);
 	 };
 	 remove_sliders = function(map) {
 	     try {
 		 map.removeLayer(time_slider);
 	     } catch(err) {}
 	     try {
-		 map.removeLayer(levels_slider);
+		 map.removeLayer(heights_slider);
 	     } catch(err) {}
 	 };
-	 setup_sliders = function(levels, times, map) {
+	 setup_sliders = function(heights, times, map) {
 	     remove_sliders(map);
-	     create_sliders(levels, times, map);
+	     create_sliders(heights, times, map);
 	 };
 
 
@@ -499,13 +499,19 @@
 	 /* I should write a function that organizes the geojson, and
 	    call that function here, using this to set up the simulation
 	    info */
-	 var data_folder = 'data/' + site + '/bck/';
+	 var fwd_folder;
+	 if (fwd) {
+	     fwd_folder = 'fwd/';
+	 } else {
+	     fwd_folder = 'bck/';
+	 }
+	 var data_folder = 'data/' + site + '/' + fwd_folder;
 	 var meta_file = data_folder + 'meta.json';
 	 $.get(meta_file, function(json) {
 	     times = json['times'].map(function(text) {return new Date(text)});
-	     levels = json['levels'];
+	     heights = json['heights'];
 	     /* set up the sliders */
-	     setup_sliders(levels, times, map);
+	     setup_sliders(heights, times, map);
 	 });
 
 
