@@ -214,7 +214,7 @@
 		 labels.push(
 		     '<span id="ng' + from + '"><i style="background:' + getColor(from) + '"></i> <b>' +
 		     '10<sup>' + from + '</sup>' +
-																												  (i + 1 < grades.length ? '&ndash;10<sup>' + to + '</sup>' : '+') + '</b> ng/m<sup>3</sup></span>');
+																															     (i + 1 < grades.length ? '&ndash;10<sup>' + to + '</sup>' : '+') + '</b> ng/m<sup>3</sup></span>');
 	     }
 	     div.innerHTML = legend_title + labels.join('<br>');
 	     return div;
@@ -356,6 +356,14 @@
 	     };
 	 }
 
+	 function trStyle(feature) {
+	     return {
+		 weight: 3,
+		 opacity: .6,
+		 color: '#5075DB'
+	     };
+	 }
+
 	 function highlightFeature(e) {
 	     var contour = e.target;
 	     tooltip_options = {sticky: true}
@@ -393,7 +401,10 @@
 	     if ($.inArray(site, Object.keys(geoms)) == -1) {
 		 geoms[site] = {};
 	     }
-	     site_geoms = geoms[site];
+	     if ($.inArray(fwd, Object.keys(geoms[site])) == -1) {
+		 geoms[site][fwd] = {};
+	     }
+	     site_geoms = geoms[site][fwd];
 	     if ($.inArray(time, Object.keys(site_geoms)) == -1) {
 		 site_geoms[time] = {};
 	     }
@@ -415,7 +426,6 @@
 		 folder = 'data/' + site + '/' + fwd_folder;
 		 file_path = folder + 'height' + height + '_time' + time + '.json';
 		 $.getJSON(file_path, function(gjson) {
-		     json = gjson;
 		     try {
 			 map.removeLayer(map['pm_layer']);
 		     } catch(err) {}
@@ -433,12 +443,7 @@
 			     smoothFactor: 1
 			 }).addTo(map);
 		     }
-		     /* a tooltip for the layer */
-		     /* tooltip_options = {sticky: true}
-			tooltip = L.tooltip(tooltip_options, pm_layer);*/
-		     /* tooltip.setTooltipContent(pm_layer.feature.properties.level);*/
-		     /* pm_layer.bindTooltip(tooltip);*/
-		     geoms[site][time][height] = map['pm_layer'];
+		     geoms[site][fwd][time][height] = map['pm_layer'];
 		 });
 	     }
 	 };
@@ -492,6 +497,17 @@
 	     var data_folder = 'data/' + site + '/' + fwd_folder;
 	     var meta_file = data_folder + 'meta.json';
 	     $.get(meta_file, function(json) {
+		 /* a trajectory! */
+		 /* try {
+		    map['trajectory'].remove()
+		    } catch(err) {}
+		    try {
+		    map['trajectory'] = L.geoJSON(json['trajectory'], {
+		    style: trStyle,
+		    smoothFactor: 1
+		    }).addTo(map);
+		    } catch (err) {}*/
+		 
 		 /* the available times and heights for the current site */
 		 var times = json['times'].map(function(text) {return new Date(text)});
 		 var heights = json['heights'];
@@ -500,6 +516,23 @@
 		 /* add some utility functions that depend on times and heights */
 		 changeTime = function(t) {
 		     time = t;
+		     try {
+			 map['trajectory'].remove();
+		     } catch(err) {};
+		     try {
+			 tr2 = {'type': 'LineString'};
+			 if (fwd) {
+			     var line_coords = json['trajectory']['coordinates'];
+			     tr2['coordinates'] = line_coords.slice(0, parseInt(t) + 2);		 
+			 } else {
+			     var line_coords = json['trajectory']['coordinates'];
+			     tr2['coordinates'] = line_coords.slice(0, line_coords.length - (parseInt(t))).reverse();
+			 }
+			 map['trajectory'] = L.geoJSON(tr2, {
+			     style: trStyle,
+			     smoothFactor: 1
+			 }).addTo(map);
+		     } catch(err) {};
 		     chooseData(time, height, fwd, site, geoms);
 		 };
 		 changeHeight = function(h) {
