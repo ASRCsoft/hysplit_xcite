@@ -168,24 +168,12 @@
 	<script type="text/javascript">
 
 	 /* useful global variables */
-	 
-	 /* currently selected time */
-	 var times = [];
-	 var time = '1:00'; // change this soon!
-	 /* currently selected level (height) */
-	 var heights = [];
-	 var height;
-	 var height = 0; // change this soon!
-	 var site = 'BUFF'; // current site
-	 var fwd = true; // boolean value: forward or backward?
 	 /* contour levels */
 	 var levels = [-2, -1, 0, 1, 2, 3, 4, 5];
 	 /* object containing contour geometries (for caching) */
 	 var geoms = {};
-	 /* currently displayed contours */
-	 var pm_layer;
-	 /* data about the current model (heights, levels, etc.) */
-	 var meta;
+	 /* default site */
+	 var starting_site = 'BUFF';
 
 	 /* first set up the non-changing stuff: */
 
@@ -226,7 +214,7 @@
 		 labels.push(
 		     '<span id="ng' + from + '"><i style="background:' + getColor(from) + '"></i> <b>' +
 		     '10<sup>' + from + '</sup>' +
-																						    (i + 1 < grades.length ? '&ndash;10<sup>' + to + '</sup>' : '+') + '</b> ng/m<sup>3</sup></span>');
+																												  (i + 1 < grades.length ? '&ndash;10<sup>' + to + '</sup>' : '+') + '</b> ng/m<sup>3</sup></span>');
 	     }
 	     div.innerHTML = legend_title + labels.join('<br>');
 	     return div;
@@ -289,8 +277,8 @@
 		       fillOpacity: .2};
 	 cm_red_options = {radius: 7, color: 'red',
 			   weight: 2, opacity: .6};
-	 cm_orig_options1 = {radius: 5, color: '#ff9000',
-			     weight: 2, fillOpacity: .6};
+	 cm_orig_options = {radius: 5, color: '#ff9000',
+			    weight: 2, fillOpacity: .6};
 	 /* var circle_markers = [];*/
 	 var origin_circle;
 	 var sites_layer;
@@ -301,10 +289,10 @@
 		 var lat = parseFloat(site['lat [degrees]']);
 		 var lon = parseFloat(site['lon [degrees]']);
 		 var this_marker;
-		 if (site['stid'] == 'BUFF') {
+		 if (site['stid'] == starting_site) {
 		     this_options = cm_red_options;
-		     origin_circle1 = L.circleMarker([lat, lon], cm_orig_options1);
-		     origin_circle1.addTo(map);
+		     map['origin_circle'] = L.circleMarker([lat, lon], cm_orig_options);
+		     map['origin_circle'].addTo(map);
 		 } else {
 		     this_options = cm_options;
 		 }
@@ -315,7 +303,29 @@
 		     this.setStyle(this_options);
 		     site_info.update();
 		 }, this_marker);
+		 this_marker.on('click', function(e) {
+		     /* update the contours */
+		     changeSite(this['site_name'], true, geoms);
+		     /* update the clicked marker */
+		     this.setStyle(cm_red_options);
+		     this.on('mouseout', function (e) {
+			 this.setStyle(cm_red_options);
+			 site_info.update();
+		     });
+		     /* update the previously selected marker */
+		     site_map['selected_circle'].setStyle(cm_options);
+		     /* make the clicked marker the new selected marker */
+		     site_map['selected_circle'] = this;
+		     /* update the map origin point */
+		     var latlon = [this._latlng.lat, this._latlng.lng]
+		     map['origin_circle'].remove();
+		     map['origin_circle'] = L.circleMarker(latlon, cm_orig_options);
+		     map['origin_circle'].addTo(map);
+		 });
 		 sites_layer.addLayer(this_marker);
+		 if (this_marker['site_name'] == starting_site) {
+		     site_map['selected_circle'] = this_marker;
+		 }
 	     });
 	     
 	     sites_layer.addTo(site_map);
@@ -372,7 +382,7 @@
 	 }
 
 	 /* change displayed data */
-	 function chooseData(time, height, fwd) {
+	 function chooseData(time, height, fwd, site, geoms) {
 	     /* use topojson? */
 	     var topojson = true;
 	     
@@ -380,24 +390,22 @@
 	     var cached = true;
 	     /* need to get time and height indices as opposed to
 		values */
-	     var which_time = $.inArray(time, times);
-	     var which_height = $.inArray(height, heights);
 	     if ($.inArray(site, Object.keys(geoms)) == -1) {
 		 geoms[site] = {};
 	     }
 	     site_geoms = geoms[site];
-	     if ($.inArray(which_time, Object.keys(site_geoms)) == -1) {
-		 site_geoms[which_time] = {};
+	     if ($.inArray(time, Object.keys(site_geoms)) == -1) {
+		 site_geoms[time] = {};
 	     }
-	     if ($.inArray(which_height, Object.keys(site_geoms[which_time])) == -1) {
+	     if ($.inArray(height, Object.keys(site_geoms[time])) == -1) {
 		 cached = false;
 	     }
 
 	     if (cached) {
 		 try {
-		     map.removeLayer(pm_layer);
+		     map.removeLayer(map['pm_layer']);
 		 } catch(err) {}
-		 pm_layer = site_geoms[which_time][which_height].addTo(map);
+		 map['pm_layer'] = site_geoms[time][height].addTo(map);
 	     } else {
 		 if (fwd) {
 		     fwd_folder = 'fwd/';
@@ -405,20 +413,20 @@
 		     fwd_folder = 'bck/';
 		 }
 		 folder = 'data/' + site + '/' + fwd_folder;
-		 file_path = folder + 'height' + which_height + '_time' + which_time + '.json';
+		 file_path = folder + 'height' + height + '_time' + time + '.json';
 		 $.getJSON(file_path, function(gjson) {
 		     json = gjson;
 		     try {
-			 map.removeLayer(pm_layer);
+			 map.removeLayer(map['pm_layer']);
 		     } catch(err) {}
 		     if (topojson) {
-			 pm_layer = L.topoJson(gjson, {
+			 map['pm_layer'] = L.topoJson(gjson, {
 			     style: style,
 			     onEachFeature: onEachFeature,
 			     smoothFactor: .5
 			 }).addTo(map);
 		     } else {
-			 pm_layer = L.geoJson(gjson.features, {
+			 map['pm_layer'] = L.geoJson(gjson.features, {
 			     style: style,
 			     onEachFeature: onEachFeature,
 			     /* might need to be lowered due to inconsistent simplified contours */
@@ -430,51 +438,31 @@
 			tooltip = L.tooltip(tooltip_options, pm_layer);*/
 		     /* tooltip.setTooltipContent(pm_layer.feature.properties.level);*/
 		     /* pm_layer.bindTooltip(tooltip);*/
-		     geoms[site][which_time][which_height] = pm_layer;
+		     geoms[site][time][height] = map['pm_layer'];
 		 });
-	     }
-	 };
-
-	 function changeTime(t) {
-	     time = times[t];
-	     chooseData(time, height, fwd);
-	 };
-	 function changeHeight(l) {
-	     height = heights[l];
-	     chooseData(time, height, fwd);
-	 };
-	 function changeFwd(fwd) {
-	     chooseData(time, height, fwd);
-	 };
-	 function displayNextTime() {
-	     var which_time = $.inArray(time, times);
-	     if (which_time < times.length - 1) {
-		 changeTime(which_time + 1);
-	     } else {
-		 changeTime(0);
 	     }
 	 };
 
 	 /* slider stuff */
 	 create_time_slider = function(times, map) {
-	     time_slider = L.control.slider(function(t) {changeTime(t);},
-					    {id: 'time_slider', orientation: 'horizontal',
-					     title: 'Select Hour', value: 0, min: 0,
-					     max: times.length - 1, position: 'bottomleft',
-					     logo: 'Time', size: '400px', collapsed: false,
-					     getValue: function(time) {return times[time].toLocaleTimeString();},
-					     syncSlider: true });
-	     time_slider.addTo(map);
+	     map['time_slider'] = L.control.slider(function(t) {changeTime(t);},
+						   {id: 'time_slider', orientation: 'horizontal',
+						    title: 'Select Hour', value: 0, min: 0,
+						    max: times.length - 1, position: 'bottomleft',
+						    logo: 'Time', size: '400px', collapsed: false,
+						    getValue: function(time) {return times[time].toLocaleTimeString();},
+						    syncSlider: true });
+	     map['time_slider'].addTo(map);
 	 };
 	 create_heights_slider = function(heights, map) {
-	     height_slider = L.control.slider(function(l) {changeHeight(l);},
-					      {id: 'height_slider', orientation: 'vertical',
-					       title: 'Select Height', value: 0,
-					       max: heights.length - 1, position: 'bottomleft',
-					       logo: 'Height', size: '100px', collapsed: false,
-					       getValue: function(height) {return heights[height] + 'm';},
-					       syncSlider: true });
-	     height_slider.addTo(map);
+	     map['height_slider'] = L.control.slider(function(l) {changeHeight(l);},
+						     {id: 'height_slider', orientation: 'vertical',
+						      title: 'Select Height', value: 0,
+						      max: heights.length - 1, position: 'bottomleft',
+						      logo: 'Height', size: '100px', collapsed: false,
+						      getValue: function(height) {return heights[height] + 'm';},
+						      syncSlider: true });
+	     map['height_slider'].addTo(map);
 	 };
 	 create_sliders = function(heights, times, map) {
 	     create_time_slider(times, map);
@@ -482,10 +470,10 @@
 	 };
 	 remove_sliders = function(map) {
 	     try {
-		 map.removeLayer(time_slider);
+		 map['time_slider'].remove();
 	     } catch(err) {}
 	     try {
-		 map.removeLayer(heights_slider);
+		 map['height_slider'].remove();
 	     } catch(err) {}
 	 };
 	 setup_sliders = function(heights, times, map) {
@@ -494,26 +482,47 @@
 	 };
 
 
+	 changeSite = function(site, fwd, geoms) {
+	     var fwd_folder;
+	     if (fwd) {
+		 fwd_folder = 'fwd/';
+	     } else {
+		 fwd_folder = 'bck/';
+	     }
+	     var data_folder = 'data/' + site + '/' + fwd_folder;
+	     var meta_file = data_folder + 'meta.json';
+	     $.get(meta_file, function(json) {
+		 /* the available times and heights for the current site */
+		 var times = json['times'].map(function(text) {return new Date(text)});
+		 var heights = json['heights'];
+		 var time = 0;
+		 var height = 0;
+		 /* add some utility functions that depend on times and heights */
+		 changeTime = function(t) {
+		     time = t;
+		     chooseData(time, height, fwd, site, geoms);
+		 };
+		 changeHeight = function(h) {
+		     height = h;
+		     chooseData(time, height, fwd, site, geoms);
+		 };
+		 function changeFwd(f) {
+		     fwd = f;
+		     chooseData(time, height, fwd, site, geoms);
+		 };
+		 function displayNextTime() {
+		     if (time < times.length - 1) {
+			 changeTime(which_time + 1);
+		     } else {
+			 changeTime(0);
+		     }
+		 };
+		 /* set up the sliders */
+		 setup_sliders(heights, times, map);
+	     });
+	 };
 
-	 /* get data about the simulation */
-	 /* I should write a function that organizes the geojson, and
-	    call that function here, using this to set up the simulation
-	    info */
-	 var fwd_folder;
-	 if (fwd) {
-	     fwd_folder = 'fwd/';
-	 } else {
-	     fwd_folder = 'bck/';
-	 }
-	 var data_folder = 'data/' + site + '/' + fwd_folder;
-	 var meta_file = data_folder + 'meta.json';
-	 $.get(meta_file, function(json) {
-	     times = json['times'].map(function(text) {return new Date(text)});
-	     heights = json['heights'];
-	     /* set up the sliders */
-	     setup_sliders(heights, times, map);
-	 });
-
+	 changeSite('BUFF', true, geoms);
 
 
 
