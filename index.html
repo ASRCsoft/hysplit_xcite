@@ -138,7 +138,28 @@
 		 L.GeoJSON.prototype.addData.call(this, data);
 
 		 return this;
-	     }
+	     },
+	     /* load the data when needed */
+	     loadData: function(url) {
+		 if (!this.dataIsLoaded) {
+		     var topo = this;
+		     $.getJSON(this.options.file_path, function(gjson) {
+			 topo.initialize(gjson, topo.options);
+			 topo.dataIsLoaded = true;
+			 return null;
+		     });
+		 };
+	     },
+	     addTo: function (map) {
+		 this.loadData(this.options.file_path);
+		 L.GeoJSON.prototype.addTo.call(this, map);
+		 return this;
+	     },
+	     beforeAdd: function(map) {
+		 this.loadData(this.options.file_path);
+		 return null;
+	     },
+	     dataIsLoaded: false
 	 });
 
 	 L.topoJson = function (data, options) {
