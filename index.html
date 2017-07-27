@@ -69,6 +69,10 @@
 	  */
 
 	 L.TopoJSON = L.GeoJSON.extend({
+	     /* This is a lazy-loading topojson layer. I want to also
+		make changes so that the shapes get simplified in a
+		topologically-aware way, but that will be hard.*/
+	     
 	     /* first simplify the topojson, then remove the
 		simplification from the options */
 
@@ -138,7 +142,28 @@
 		 L.GeoJSON.prototype.addData.call(this, data);
 
 		 return this;
-	     }
+	     },
+	     /* load the data when needed */
+	     loadData: function(url) {
+		 if (!this.dataIsLoaded) {
+		     var topo = this;
+		     $.getJSON(this.options.file_path, function(gjson) {
+			 topo.initialize(gjson, topo.options);
+			 topo.dataIsLoaded = true;
+			 return null;
+		     });
+		 };
+	     },
+	     addTo: function (map) {
+		 this.loadData(this.options.file_path);
+		 L.GeoJSON.prototype.addTo.call(this, map);
+		 return this;
+	     },
+	     beforeAdd: function(map) {
+		 this.loadData(this.options.file_path);
+		 return null;
+	     },
+	     dataIsLoaded: false
 	 });
 
 	 L.topoJson = function (data, options) {
@@ -214,7 +239,7 @@
 		 labels.push(
 		     '<span id="ng' + from + '"><i style="background:' + getColor(from) + '"></i> <b>' +
 		     '10<sup>' + from + '</sup>' +
-																																	      (i + 1 < grades.length ? '&ndash;10<sup>' + to + '</sup>' : '+') + '</b> ng/m<sup>3</sup></span>');
+																																				  (i + 1 < grades.length ? '&ndash;10<sup>' + to + '</sup>' : '+') + '</b> ng/m<sup>3</sup></span>');
 	     }
 	     div.innerHTML = legend_title + labels.join('<br>');
 	     return div;
@@ -396,65 +421,6 @@
 	     });
 	 }
 
-	 /* change displayed data */
-	 function chooseData(time, height, fwd, site, geoms) {
-	     /* use topojson? */
-	     var topojson = true;
-	     
-	     /* see if we can get cached data */
-	     var cached = true;
-	     /* need to get time and height indices as opposed to
-		values */
-	     if ($.inArray(site, Object.keys(geoms)) == -1) {
-		 geoms[site] = {};
-	     }
-	     if ($.inArray(fwd, Object.keys(geoms[site])) == -1) {
-		 geoms[site][fwd] = {};
-	     }
-	     site_geoms = geoms[site][fwd];
-	     if ($.inArray(time, Object.keys(site_geoms)) == -1) {
-		 site_geoms[time] = {};
-	     }
-	     if ($.inArray(height, Object.keys(site_geoms[time])) == -1) {
-		 cached = false;
-	     }
-
-	     if (cached) {
-		 try {
-		     map.removeLayer(map['pm_layer']);
-		 } catch(err) {}
-		 map['pm_layer'] = site_geoms[time][height].addTo(map);
-	     } else {
-		 if (fwd) {
-		     fwd_folder = 'fwd/';
-		 } else {
-		     fwd_folder = 'bck/';
-		 }
-		 folder = 'data/' + site + '/' + fwd_folder;
-		 file_path = folder + 'height' + height + '_time' + time + '.json';
-		 $.getJSON(file_path, function(gjson) {
-		     try {
-			 map.removeLayer(map['pm_layer']);
-		     } catch(err) {};
-		     if (topojson) {
-			 map['pm_layer'] = L.topoJson(gjson, {
-			     style: style,
-			     onEachFeature: onEachFeature,
-			     smoothFactor: .5
-			 }).addTo(map);
-		     } else {
-			 map['pm_layer'] = L.geoJson(gjson.features, {
-			     style: style,
-			     onEachFeature: onEachFeature,
-			     /* might need to be lowered due to inconsistent simplified contours */
-			     smoothFactor: 1
-			 }).addTo(map);
-		     };
-		     geoms[site][fwd][time][height] = map['pm_layer'];
-		 });
-	     };
-	 };
-
 	 /* slider stuff */
 	 create_time_slider = function(times, map) {
 	     map['time_slider'] = L.control.slider(function(t) {changeTime(t);},
@@ -466,26 +432,12 @@
 						    syncSlider: true });
 	     map['time_slider'].addTo(map);
 	 };
-	 create_heights_slider = function(heights, map) {
-	     map['height_slider'] = L.control.slider(function(l) {changeHeight(l);},
-						     {id: 'height_slider', orientation: 'vertical',
-						      title: 'Select Height', value: 0,
-						      max: heights.length - 1, position: 'bottomleft',
-						      logo: 'Height', size: '100px', collapsed: false,
-						      getValue: function(height) {return heights[height] + 'm';},
-						      syncSlider: true });
-	     map['height_slider'].addTo(map);
-	 };
 	 create_sliders = function(heights, times, map) {
 	     create_time_slider(times, map);
-	     create_heights_slider(heights, map);
 	 };
 	 remove_sliders = function(map) {
 	     try {
 		 map['time_slider'].remove();
-	     } catch(err) {}
-	     try {
-		 map['height_slider'].remove();
 	     } catch(err) {}
 	 };
 	 setup_sliders = function(heights, times, map) {
@@ -504,65 +456,56 @@
 	     var data_folder = 'data/' + site + '/' + fwd_folder;
 	     var meta_file = data_folder + 'meta.json';
 	     $.get(meta_file, function(json) {
-		 /* a trajectory! */
-		 /* try {
-		    map['trajectory'].remove()
-		    } catch(err) {}
-		    try {
-		    map['trajectory'] = L.geoJSON(json['trajectory'], {
-		    style: trStyle,
-		    smoothFactor: 1
-		    }).addTo(map);
-		    } catch (err) {}*/
-		 
-		 /* the available times and heights for the current site */
 		 var times = json['times'].map(function(text) {return new Date(text)});
 		 var heights = json['heights'];
+		 if ($.inArray(site, Object.keys(geoms)) == -1) {
+		     geoms[site] = {};
+		 }
+		 if ($.inArray(fwd, Object.keys(geoms[site])) == -1) {
+		     geoms[site][fwd] = {};
+		 }
+		 /* site_geoms = geoms[site][fwd];*/
+		 $.each(times, function(time) {
+		     if ($.inArray(time, Object.keys(geoms[site][fwd])) == -1) {
+			 geoms[site][fwd][time] = {};
+		     };
+		     $.each(heights, function(height) {
+			 if (fwd) {
+			     fwd_folder = 'fwd/';
+			 } else {
+			     fwd_folder = 'bck/';
+			 }
+			 folder = 'data/' + site + '/' + fwd_folder;
+			 file_path = folder + 'height' + height + '_time' + time + '.json';
+			 if ($.inArray(height, Object.keys(geoms[site][fwd][time])) == -1) {
+			     geoms[site][fwd][time][height] = L.topoJson(null, {
+				 style: style,
+				 onEachFeature: onEachFeature,
+				 smoothFactor: .5,
+				 file_path: file_path
+			     });
+			     /* cached = false;*/
+			 };
+		     });
+		 });
+		 
+		 /* the available times and heights for the current site */
 		 var time = 0;
 		 var height = 0;
+		 /* geoms[site][fwd][5][1].addTo(map);*/
+		 var heightLayers = {
+		     'Deposition': geoms[site][fwd][5][0],
+		     '0-150m': geoms[site][fwd][5][1],
+		     '150-300m': geoms[site][fwd][5][2]
+		 }
+		 L.control.layers(heightLayers).addTo(map);
 		 /* add some utility functions that depend on times and heights */
-		 changeTime = function(t) {
-		     time = t;
-		     try {
-			 map['trajectory'].remove();
-		     } catch(err) {};
-		     try {
-			 tr2 = {'type': 'LineString'};
-			 if (fwd) {
-			     var line_coords = json['trajectory']['coordinates'];
-			     tr2['coordinates'] = line_coords.slice(0, parseInt(t) + 2);		 
-			 } else {
-			     var line_coords = json['trajectory']['coordinates'];
-			     tr2['coordinates'] = line_coords.slice(0, line_coords.length - (parseInt(t))).reverse();
-			 }
-			 map['trajectory'] = L.geoJSON(tr2, {
-			     style: trStyle,
-			     smoothFactor: 1
-			 }).addTo(map);
-		     } catch(err) {};
-		     chooseData(time, height, fwd, site, geoms);
-		 };
-		 changeHeight = function(h) {
-		     height = h;
-		     chooseData(time, height, fwd, site, geoms);
-		 };
-		 function changeFwd(f) {
-		     fwd = f;
-		     chooseData(time, height, fwd, site, geoms);
-		 };
-		 function displayNextTime() {
-		     if (time < times.length - 1) {
-			 changeTime(which_time + 1);
-		     } else {
-			 changeTime(0);
-		     }
-		 };
 		 /* set up the sliders */
-		 setup_sliders(heights, times, map);
+		 /* setup_sliders(heights, times, map);*/
 	     });
 	 };
 
-	 changeSite('BUFF', true, geoms);
+	 changeSite(starting_site, true, geoms);
 
 
 
