@@ -235,7 +235,7 @@
 		 labels.push(
 		     '<span id="ng' + from + '"><i style="background:' + getColor(from) + '"></i> <b>' +
 		     '10<sup>' + from + '</sup>' +
-																																	      (i + 1 < grades.length ? '&ndash;10<sup>' + to + '</sup>' : '+') + '</b> ng/m<sup>3</sup></span>');
+																																		      (i + 1 < grades.length ? '&ndash;10<sup>' + to + '</sup>' : '+') + '</b> ng/m<sup>3</sup></span>');
 	     }
 	     div.innerHTML = legend_title + labels.join('<br>');
 	     return div;
@@ -462,15 +462,17 @@
 			     style: style,
 			     onEachFeature: onEachFeature,
 			     smoothFactor: .5
-			 }).addTo(map);
+			 });
 		     } else {
 			 map['pm_layer'] = L.geoJson(gjson.features, {
 			     style: style,
 			     onEachFeature: onEachFeature,
 			     /* might need to be lowered due to inconsistent simplified contours */
 			     smoothFactor: 1
-			 }).addTo(map);
+			 });
 		     };
+		     contour_layers.clearLayers();
+		     contour_layers.addLayer(map['pm_layer']);
 		     geoms[site][fwd][time][height] = map['pm_layer'];
 		 });
 	     };
@@ -515,6 +517,14 @@
 	 };
 
 
+	 /* need to have a layer controller */
+	 var contour_layers = L.layerGroup([]);
+	 var traj_layers = L.layerGroup([]);
+	 overlayMaps = {
+	     'Contour': contour_layers,
+	     'Trajectory': traj_layers
+	 }
+	 layerer = L.control.layers(null, overlayMaps, {position: 'topleft'}).addTo(map);
 	 changeSite = function(site, fwd, geoms) {
 	     var fwd_folder;
 	     if (fwd) {
@@ -559,7 +569,9 @@
 			 map['trajectory'] = L.geoJSON(tr2, {
 			     style: trStyle,
 			     smoothFactor: 1
-			 }).addTo(map);
+			 });
+			 traj_layers.clearLayers();
+			 traj_layers.addLayer(map['trajectory']);
 		     } catch(err) {};
 		     chooseData(time, height, fwd, site, geoms);
 		 };
