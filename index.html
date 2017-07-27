@@ -197,8 +197,9 @@
 	 var starting_site = 'BUFF';
 
 	 /* first set up the non-changing stuff: */
-
-	 var map = L.map('map').setView([43, -74.5], 7);
+	 var contour_layers = L.layerGroup([]);
+	 var traj_layers = L.layerGroup([]);
+	 var map = L.map('map', {layers: [contour_layers, traj_layers]}).setView([43, -74.5], 7);
 
 	 L.tileLayer('https://api.tiles.mapbox.com/v4/{id}/{z}/{x}/{y}.png?access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw', {
 	     maxZoom: 18,
@@ -235,7 +236,7 @@
 		 labels.push(
 		     '<span id="ng' + from + '"><i style="background:' + getColor(from) + '"></i> <b>' +
 		     '10<sup>' + from + '</sup>' +
-																																		      (i + 1 < grades.length ? '&ndash;10<sup>' + to + '</sup>' : '+') + '</b> ng/m<sup>3</sup></span>');
+																																			    (i + 1 < grades.length ? '&ndash;10<sup>' + to + '</sup>' : '+') + '</b> ng/m<sup>3</sup></span>');
 	     }
 	     div.innerHTML = legend_title + labels.join('<br>');
 	     return div;
@@ -441,10 +442,8 @@
 	     }
 
 	     if (cached) {
-		 try {
-		     map.removeLayer(map['pm_layer']);
-		 } catch(err) {}
-		 map['pm_layer'] = site_geoms[time][height].addTo(map);
+		 contour_layers.clearLayers();
+		 contour_layers.addLayer(site_geoms[time][height]);
 	     } else {
 		 if (fwd) {
 		     fwd_folder = 'fwd/';
@@ -454,17 +453,15 @@
 		 folder = 'data/' + site + '/' + fwd_folder;
 		 file_path = folder + 'height' + height + '_time' + time + '.json';
 		 $.getJSON(file_path, function(gjson) {
-		     try {
-			 map.removeLayer(map['pm_layer']);
-		     } catch(err) {};
+		     var pm_layer;
 		     if (topojson) {
-			 map['pm_layer'] = L.topoJson(gjson, {
+			 pm_layer = L.topoJson(gjson, {
 			     style: style,
 			     onEachFeature: onEachFeature,
 			     smoothFactor: .5
 			 });
 		     } else {
-			 map['pm_layer'] = L.geoJson(gjson.features, {
+			 pm_layer = L.geoJson(gjson.features, {
 			     style: style,
 			     onEachFeature: onEachFeature,
 			     /* might need to be lowered due to inconsistent simplified contours */
@@ -472,8 +469,8 @@
 			 });
 		     };
 		     contour_layers.clearLayers();
-		     contour_layers.addLayer(map['pm_layer']);
-		     geoms[site][fwd][time][height] = map['pm_layer'];
+		     contour_layers.addLayer(pm_layer);
+		     geoms[site][fwd][time][height] = pm_layer;
 		 });
 	     };
 	 };
@@ -518,8 +515,6 @@
 
 
 	 /* need to have a layer controller */
-	 var contour_layers = L.layerGroup([]);
-	 var traj_layers = L.layerGroup([]);
 	 overlayMaps = {
 	     'Contour': contour_layers,
 	     'Trajectory': traj_layers
@@ -554,9 +549,8 @@
 		 /* add some utility functions that depend on times and heights */
 		 changeTime = function(t) {
 		     time = t;
-		     try {
-			 map['trajectory'].remove();
-		     } catch(err) {};
+		     var traj;
+		     var tr2;
 		     try {
 			 tr2 = {'type': 'LineString'};
 			 if (fwd) {
@@ -566,13 +560,15 @@
 			     var line_coords = json['trajectory']['coordinates'];
 			     tr2['coordinates'] = line_coords.slice(0, line_coords.length - (parseInt(t))).reverse();
 			 }
-			 map['trajectory'] = L.geoJSON(tr2, {
+			 traj = L.geoJSON(tr2, {
 			     style: trStyle,
 			     smoothFactor: 1
 			 });
 			 traj_layers.clearLayers();
-			 traj_layers.addLayer(map['trajectory']);
-		     } catch(err) {};
+			 traj_layers.addLayer(traj);
+		     } catch(err) {
+			 traj_layers.clearLayers();
+		     };
 		     chooseData(time, height, fwd, site, geoms);
 		 };
 		 changeHeight = function(h) {
