@@ -1,6 +1,6 @@
 <html>
     <head>
-	<title>HYSPLIT - xCITE Data Lab</title>
+	<title>HYSPLIT Viewer - xCITE Data Lab</title>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<!-- leaflet stuff -->
@@ -10,182 +10,16 @@
 	<script src="https://unpkg.com/topojson@3"></script>
 	<!-- jquery stuff -->
 	<script src="https://code.jquery.com/jquery-3.2.1.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-csv/0.8.3/jquery.csv.min.js"></script>
 	<!-- slider stuff -->
 	<script src="js/leaflet-slider.js"></script>
 	<link rel="stylesheet" href="css/leaflet-slider.css">
-	<!-- read csv files -->
-	<script src="js/jquery.csv.min.js"></script>
-	<style>
-	 /* oh this helps so much */
-	 body {margin: 0}
-	 #map {
-	     width: 100%;
-	     height: 100%;
-	     min-height: 650px;
-	 }
-	 #locator {
-	     width: 350px;
-	     height: 350px;
-	     z-index: 0;
-	     border-radius: 2px;
-	 }
-	 .leaflet-top.leaflet-right .leaflet-control {
-	     clear: none;
-	 }
-	 .info {
-	     padding: 6px 8px;
-	     font: 14px/16px Arial, Helvetica, sans-serif;
-	     background: white;
-	     background: rgba(255,255,255,0.8);
-	     box-shadow: 0 0 15px rgba(0,0,0,0.2);
-	     border-radius: 5px;
-	     margin: 10px;
-	 }
-	 .info h4 {
-	     margin: 0 0 5px;
-	     color: #777;
-	 }
-	 .legend {
-	     text-align: left;
-	     line-height: 18px;
-	     color: #555;
-	 }
-	 .legend i {
-	     width: 18px;
-	     height: 18px;
-	     float: left;
-	     margin-right: 8px;
-	     opacity: 0.7;
-	 }
-	</style>
+	<!-- hysplit app files -->
+	<script src="js/hysplit.js"></script>
+	<link rel="stylesheet" href="css/hysplit.css">
     </head>
     <body>
 	<div id="map"></div>
-	<script>
-	 /*
-	    First run npm install topojson --save and then link "node_modules/topojson/build/topojson.min.js" 
-	    above this snippet in your html.
-	    Usage: http://leafletjs.com/reference.html#geojson
-	  */
-
-	 L.TopoJSON = L.GeoJSON.extend({
-	     /* first simplify the topojson, then remove the
-		simplification from the options */
-
-	     /* work on this later! */
-	     not_working_yet_initialize: function (json, options) {
-		 if ($.inArray('smoothFactor', Object.keys(options)) == -1) {
-		     options['smoothFactor'] = 0;
-		 }
-		 /* hmm, not terrible but needs work */
-		 /* presimp_topojson = topojson.presimplify(json);
-		    simp_topojson = topojson.simplify(presimp_topojson, options['smoothFactor']);*/
-		 /* instead */
-		 function make_point(p) {
-		     return L.point(p[0], p[1], false);
-		 }
-		 function make_array(p) {
-		     return [p.x, p.y];
-		 }
-		 json2 = json;
-		 $.each(json.arcs, function (i) {
-		     dummy_object = {type: 'LineString', arcs: [[i]]};
-		     geojson = topojson.feature(json, dummy_object);
-		     points = geojson.geometry.coordinates.map(make_point);
-		     simp_points = L.LineUtil.simplify(points, options['smoothFactor']);
-		     json2.arcs[i] = simp_points.map(make_array);
-		 });
-		 /* the data is all in non-transformed format now */
-		 delete json2['transform']
-
-		 /* end of needs work zone */
-		 options['smoothFactor'] = 0;
-		 L.Util.setOptions(this, options);
-
-		 this._layers = {};
-
-		 if (json2) {
-		     this.addData(json2);
-		 }
-	     },
-	     /* going to add more here to enable topologically correct
-		polygon simplification */
-
-	     /* 1) simplify topojson arcs */
-	     /* 1a) turn topojson arcs into geojson linestrings */
-	     /* 1b) create polylines for each linestring (simplified
-		automatically) */
-	     /* 1c) get a copy of the original topojson */
-	     /* 1d) replace topojson arcs with simplified arcs from
-		polylines */
-
-	     /* 2) rewrite geojson initialize function to send
-		simplified topojson to addData */
-
-	     /* 3) I'm done? I'm done! */
-	     addData: function (data) {
-		 var geojson, key;
-		 if (data.type === "Topology") {
-		     for (key in data.objects) {
-			 if (data.objects.hasOwnProperty(key)) {
-			     geojson = topojson.feature(data, data.objects[key]);
-			     L.GeoJSON.prototype.addData.call(this, geojson);
-			 }
-		     }
-		     return this;
-		 }
-
-		 L.GeoJSON.prototype.addData.call(this, data);
-
-		 return this;
-	     },
-	     /* load the data when needed */
-	     loadData: function(url) {
-		 if (!this.dataIsLoaded) {
-		     var topo = this;
-		     $.getJSON(this.options.file_path, function(gjson) {
-			 topo.initialize(gjson, topo.options);
-			 topo.dataIsLoaded = true;
-			 return null;
-		     });
-		 };
-	     },
-	     addTo: function (map) {
-		 this.loadData(this.options.file_path);
-		 L.GeoJSON.prototype.addTo.call(this, map);
-		 return this;
-	     },
-	     beforeAdd: function(map) {
-		 this.loadData(this.options.file_path);
-		 return null;
-	     },
-	     dataIsLoaded: false
-	 });
-
-	 L.topoJson = function (data, options) {
-	     return new L.TopoJSON(data, options);
-	 };
-
-	 /* 
-	    The MIT License (MIT)
-	    Copyright (c) 2016 Brendan Vinson
-	    Permission is hereby granted, free of charge, to any person obtaining a copy
-	    of this software and associated documentation files (the "Software"), to deal
-	    in the Software without restriction, including without limitation the rights
-	    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-	    copies of the Software, and to permit persons to whom the Software is
-	    furnished to do so, subject to the following conditions:
-	    The above copyright notice and this permission notice shall be included in
-	    all copies or substantial portions of the Software.
-	    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-	    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-	    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-	    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-	    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-	    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-	    THE SOFTWARE.
-	  */
-	</script>
 	<script type="text/javascript">
 
 	 /* useful global variables */
@@ -199,7 +33,7 @@
 	 /* first set up the non-changing stuff: */
 	 var contour_layers = L.layerGroup([]);
 	 var traj_layers = L.layerGroup([]);
-	 var map = L.map('map', {layers: [contour_layers, traj_layers]}).setView([43, -74.5], 7);
+	 var map = L.map('map0', {layers: [contour_layers, traj_layers]}).setView([43, -74.5], 7);
 
 	 L.tileLayer('https://api.tiles.mapbox.com/v4/{id}/{z}/{x}/{y}.png?access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw', {
 	     maxZoom: 18,
@@ -236,7 +70,7 @@
 		 labels.push(
 		     '<span id="ng' + from + '"><i style="background:' + getColor(from) + '"></i> <b>' +
 		     '10<sup>' + from + '</sup>' +
-																																			    (i + 1 < grades.length ? '&ndash;10<sup>' + to + '</sup>' : '+') + '</b> ng/m<sup>3</sup></span>');
+																																			     (i + 1 < grades.length ? '&ndash;10<sup>' + to + '</sup>' : '+') + '</b> ng/m<sup>3</sup></span>');
 	     }
 	     div.innerHTML = legend_title + labels.join('<br>');
 	     return div;
@@ -553,11 +387,10 @@
 		     var tr2;
 		     try {
 			 tr2 = {'type': 'LineString'};
+			 var line_coords = json['trajectory']['coordinates'];
 			 if (fwd) {
-			     var line_coords = json['trajectory']['coordinates'];
 			     tr2['coordinates'] = line_coords.slice(0, parseInt(t) + 2);		 
 			 } else {
-			     var line_coords = json['trajectory']['coordinates'];
 			     tr2['coordinates'] = line_coords.slice(0, line_coords.length - (parseInt(t))).reverse();
 			 }
 			 traj = L.geoJSON(tr2, {
@@ -591,7 +424,7 @@
 	     });
 	 };
 
-	 changeSite('BUFF', true, geoms);
+	 /* changeSite('BUFF', true, geoms);*/
 
 
 
