@@ -557,6 +557,7 @@ class Hysplit {
 	    var custom_form;
 	    this._div.innerHTML = '<h4>Simulation Info:</h4>' +
 		'<p>Release site: BUFF<br>' +
+		'Trajectory: <span id="_fwd_here">Forward</span><br>' +
 		'Release time: 10am<br>' +
 		'More info about things, etc.</p>';
 	    custom_form = '<form id="hysplit" onSubmit="run_hysplit(); return false;">' +
@@ -577,6 +578,22 @@ class Hysplit {
 	L.control.layers(null, overlayMaps, {position: 'topleft'}).addTo(this.map);
     }
 
+    addFwdButton() {
+	var this2 = this;
+	var switchFwd = function(btn, map) {
+	    this2.changeFwd();
+	}
+	// var b1 = L.easyButton('fa-exchange', switchFwd);
+	var b1 = L.easyButton({
+	    states: [{
+		icon: 'fa-exchange',
+		title: 'Toggle forward and backward trajectories',
+		onClick: switchFwd
+	    }]
+	});
+	b1.addTo(h1.map);
+    }
+
     initialize(divid) {
 	var this2 = this;
 	var site_name;
@@ -593,6 +610,7 @@ class Hysplit {
 	    this2.origin_layer.addTo(this2.map);
 	    this2.addSimInfo();
 	    this2.addLayerControl();
+	    this2.addFwdButton();
 	    this2.cur_site.loadData().done(function() {
 		this2.cur_site.addTo(this2.map);
 	    });
@@ -615,5 +633,19 @@ class Hysplit {
 	    this.cur_site = this.cached_sites[name][fwd];
 	    this.cur_site.addTo(this.map);
 	}
+    }
+
+    changeFwd() {
+	var cur_fwd = this.cur_site.fwd;
+	this.changeSite(this.cur_site.name, !this.cur_site.fwd);
+	// update the simulation info
+	var fwd_text;
+	// flip the forward text
+	if (cur_fwd) {
+	    fwd_text = 'Backward';
+	} else {
+	    fwd_text = 'Forward';
+	}
+	$('#_fwd_here').text(fwd_text);
     }
 }

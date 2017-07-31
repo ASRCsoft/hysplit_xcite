@@ -44,3 +44,8 @@ body {margin: 0}
     margin-right: 8px;
     opacity: 0.7;
 }
+
+/* needed to fix the fwd-switching button! */
+.easy-button-button .button-state {
+    display: inline;
+}
