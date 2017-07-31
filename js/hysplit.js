@@ -255,25 +255,27 @@ class Site {
 
     changeTime(time) {
 	this.displayData(time, this.height);
-	this.time = time;
     }
 
     changeHeight(height) {
 	this.displayData(this.time, height);
-	this.height = height;
     };
 
     create_time_slider() {
 	var times = this.times;
-	this.times2 = times;
-	var this2 = this;
-	this.time_slider = L.control.slider(function(t) {this2.changeTime(t);},
-					    {id: 'time_slider', orientation: 'horizontal',
-					     title: 'Select Hour', value: 0, min: 0,
-					     max: times.length - 1, position: 'bottomleft',
-					     logo: 'Time', size: '400px', collapsed: false,
-					     getValue: function(time) {return times[time].toLocaleTimeString();},
-					     syncSlider: true });
+	// the time dimension
+	this.td = L.timeDimension({times: times});
+	var time_options = {timeDimension: this.td, loopButton: true};
+	this.time_slider = L.control.timeDimension(time_options);
+	// this.times2 = times;
+	// var this2 = this;
+	// this.time_slider = L.control.slider(function(t) {this2.changeTime(t);},
+	// 				    {id: 'time_slider', orientation: 'horizontal',
+	// 				     title: 'Select Hour', value: 0, min: 0,
+	// 				     max: times.length - 1, position: 'bottomleft',
+	// 				     logo: 'Time', size: '400px', collapsed: false,
+	// 				     getValue: function(time) {return times[time].toLocaleTimeString();},
+	// 				     syncSlider: true });
     }
 
     create_height_slider() {
@@ -311,7 +313,7 @@ class Site {
 
     addTo(map) {
 	this.setup_sliders(map);
-	this.displayData(this.time, this.height);
+	// this.displayData(this.time, this.height);
     }
 
     remove() {
@@ -321,7 +323,8 @@ class Site {
 }
 
 class SiteSelector {
-    constructor(sites, start_site_name, origin_layer) {
+    constructor(sites, start_site_name, origin_layer, hysplit) {
+	this._hysplit = hysplit;
 	// the layer where the release point is stored for display on
 	// the main map
 	this.origin_layer = origin_layer;
@@ -365,6 +368,7 @@ class SiteSelector {
     }
 
     select(marker) {
+	var new_site = marker['site_name'];
 	// update the selected marker's style
 	this.updateStyle(marker, this.cm_selected_options);
 	try {
@@ -375,18 +379,15 @@ class SiteSelector {
 	this.selected = marker;
 	try {
 	    // update the info box
-	    $('#cur_site')[0].innerHTML = marker['site_name'];
+	    $('#cur_site')[0].innerHTML = new_site;
 	} catch(err) {}
 	// update the origin point on the main map
 	var lat = marker._latlng.lat;
 	var lon = marker._latlng.lng;
 	var origin = L.circleMarker([lat, lon]);
 	this.updateStyle(origin, this.cm_orig_options)
-	// marker['site_name'] = site['stid'];
-	// marker['default_style'] = this2.cm_options;
 	origin.on('mouseover', function(e) {this.mouseoverMarker(e)});
 	origin.on('mouseout', function (e) {this.mouseoutMarker(e)});
-	// origin.on('click', function(e) {this.clickMarker(e)});
 	this.origin_layer.clearLayers();
 	this.origin_layer.addLayer(origin);
     }
@@ -394,6 +395,9 @@ class SiteSelector {
     clickMarker(e) {
 	var marker = e.target;
 	this.select(marker);
+	var new_site = marker['site_name'];
+	var cur_fwd = this._hysplit.cur_site.fwd;
+	this._hysplit.changeSite(new_site, cur_fwd);
     }
 
     addSites(sites) {
@@ -405,7 +409,6 @@ class SiteSelector {
 	    marker = L.circleMarker([lat, lon]);
 	    this2.updateStyle(marker, this2.cm_options)
 	    marker['site_name'] = site['stid'];
-	    // marker['default_style'] = this2.cm_options;
 	    marker.on('mouseover', function(e) {this2.mouseoverMarker(e)});
 	    marker.on('mouseout', function (e) {this2.mouseoutMarker(e)});
 	    marker.on('click', function(e) {this2.clickMarker(e)});
@@ -541,7 +544,8 @@ class Hysplit {
 	}).addTo(this.site_map);
 
 	// add markers?
-	var site_selector = new SiteSelector(this.sites, this.cur_site.name, this.origin_layer);
+	var site_selector = new SiteSelector(this.sites, this.cur_site.name,
+					     this.origin_layer, this);
 	site_selector.addTo(this.site_map);
     }
 
