@@ -551,6 +551,15 @@ class Hysplit {
 	sim_info.addTo(this.map);
     }
 
+    addLayerControl() {
+	var this2 = this;
+	var overlayMaps = {
+	    'Contour': this2.contour_layer,
+	    'Trajectory': this2.trajectory_layer
+	}
+	L.control.layers(null, overlayMaps, {position: 'topleft'}).addTo(this.map);
+    }
+
     initialize(divid) {
 	var this2 = this;
 	var site_name;
@@ -565,6 +574,7 @@ class Hysplit {
 	    this2.addLegend();
 	    this2.addSiteSelector();
 	    this2.addSimInfo();
+	    this2.addLayerControl();
 	    this2.cur_site.loadData().done(function() {
 		this2.cur_site.addTo(this2.map);
 	    });
