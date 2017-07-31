@@ -321,7 +321,11 @@ class Site {
 }
 
 class SiteSelector {
-    constructor(sites, start_site_name) {
+    constructor(sites, start_site_name, origin_layer) {
+	// the layer where the release point is stored for display on
+	// the main map
+	this.origin_layer = origin_layer;
+	// the site markers
 	this.marker_layer = L.featureGroup();
 	this.start_site = start_site_name;
 	this.site_info;
@@ -373,6 +377,18 @@ class SiteSelector {
 	    // update the info box
 	    $('#cur_site')[0].innerHTML = marker['site_name'];
 	} catch(err) {}
+	// update the origin point on the main map
+	var lat = marker._latlng.lat;
+	var lon = marker._latlng.lng;
+	var origin = L.circleMarker([lat, lon]);
+	this.updateStyle(origin, this.cm_orig_options)
+	// marker['site_name'] = site['stid'];
+	// marker['default_style'] = this2.cm_options;
+	origin.on('mouseover', function(e) {this.mouseoverMarker(e)});
+	origin.on('mouseout', function (e) {this.mouseoutMarker(e)});
+	// origin.on('click', function(e) {this.clickMarker(e)});
+	this.origin_layer.clearLayers();
+	this.origin_layer.addLayer(origin);
     }
 
     clickMarker(e) {
@@ -433,6 +449,7 @@ class Hysplit {
 	this.sites_csv = sites_csv;
 	this.contour_layer = L.layerGroup([]);
 	this.trajectory_layer = L.layerGroup([]);
+	this.origin_layer = L.layerGroup([]);
 	this.cur_site = new Site(start_site_name, start_site_fwd, this);
 	this.map;
 	this.sites;
@@ -524,7 +541,7 @@ class Hysplit {
 	}).addTo(this.site_map);
 
 	// add markers?
-	var site_selector = new SiteSelector(this.sites, this.cur_site.name);
+	var site_selector = new SiteSelector(this.sites, this.cur_site.name, this.origin_layer);
 	site_selector.addTo(this.site_map);
     }
 
@@ -573,6 +590,7 @@ class Hysplit {
 	    this2.addTileLayer();
 	    this2.addLegend();
 	    this2.addSiteSelector();
+	    this2.origin_layer.addTo(this2.map);
 	    this2.addSimInfo();
 	    this2.addLayerControl();
 	    this2.cur_site.loadData().done(function() {
