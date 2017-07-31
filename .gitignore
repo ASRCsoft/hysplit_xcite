@@ -94,6 +94,9 @@ Thumbs.db
 *.tar
 *.zip
 
+# ignore emacs files
+*~
+
 # -------------------------
 # BEGIN Whitelisted Files
 # -------------------------
