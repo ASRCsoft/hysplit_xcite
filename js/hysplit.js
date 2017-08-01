@@ -101,6 +101,7 @@ class Site {
 	this.contours;
 	// the full geojson trajectory
 	this.trajectory;
+	this.trajectory_timedim;
 	// a 1D (times.length) array of trajectory layers
 	this.trajectories;
 	this.contour_layer = this._hysplit.contour_layer;
@@ -109,6 +110,18 @@ class Site {
 	this.time_slider;
 	this.height_slider;
     }
+
+    // move this to a time layer class!
+    // // do some stuff so this maybe could be used as a time layer
+    // isReady() {
+    // 	return true;
+    // }
+
+    // _update() {
+    // 	var time = this._timeDimension.getCurrentTime();
+    // 	var t = this.times.indexOf(time);
+    // 	this.changeTime(t);
+    // }
 
     get folder() {
 	// get the path to the metadata json for this site
@@ -234,9 +247,26 @@ class Site {
 	    this2.times = json['times'].map(function(text) {return new Date(text)});
 	    this2.heights = json['heights'];
 	    this2.makeContours();
+	    this2.timedim = L.timeDimension({times: this2.times});
 	    try {
 		// get the trajectory if it exists
 		this2.trajectory = json['trajectory'];
+		var trajectory2;
+		var t0 = this2.times[0];
+		var t1 = new Date(t0.getTime());
+		var times2 = this2.times.slice();
+		t1.setHours(t0.getHours() - 1);
+		times2.unshift(t1);
+		this2.trajectory2 = {type: 'Feature'};
+		this2.trajectory2['geometry'] = json['trajectory'];
+		this2.trajectory2['properties'] = {};
+		this2.trajectory2['properties']['times'] = times2;
+		trajectory2 = L.geoJSON(this2.trajectory2, {
+		    style: this2.trajStyle,
+		    smoothFactor: 1
+		});
+		var traj_options = {timeDimension: this2.timedim};
+		this2.trajectory_timedim = L.timeDimension.layer.geoJson(trajectory2, traj_options);
 		this2.makeTrajectories();
 	    } catch(err) {}
 	});
@@ -262,20 +292,9 @@ class Site {
     };
 
     create_time_slider() {
-	var times = this.times;
-	// the time dimension
-	this.td = L.timeDimension({times: times});
-	var time_options = {timeDimension: this.td, loopButton: true};
+	var time_options = {timeDimension: this.timedim, loopButton: true,
+			    timeSliderDragUpdate: true};
 	this.time_slider = L.control.timeDimension(time_options);
-	// this.times2 = times;
-	// var this2 = this;
-	// this.time_slider = L.control.slider(function(t) {this2.changeTime(t);},
-	// 				    {id: 'time_slider', orientation: 'horizontal',
-	// 				     title: 'Select Hour', value: 0, min: 0,
-	// 				     max: times.length - 1, position: 'bottomleft',
-	// 				     logo: 'Time', size: '400px', collapsed: false,
-	// 				     getValue: function(time) {return times[time].toLocaleTimeString();},
-	// 				     syncSlider: true });
     }
 
     create_height_slider() {
@@ -313,6 +332,7 @@ class Site {
 
     addTo(map) {
 	this.setup_sliders(map);
+	this.trajectory_timedim.addTo(map);
 	// this.displayData(this.time, this.height);
     }
 
