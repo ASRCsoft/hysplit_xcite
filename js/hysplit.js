@@ -3,6 +3,64 @@
 
 // a few functions first
 
+getColor = function(d) {
+    return d >= 5  ? '#800000' :
+	d >= 4  ? '#ff3200' :
+	d >= 3  ? '#ffb900' :
+	d >= 2  ? '#b6ff41' :
+	d >= 1  ? '#41ffb6' :
+	d >= 0  ? '#00a4ff' :
+	d >= -1 ? '#0012ff' :
+	'#000080';
+}
+
+contourStyle = function(feature) {
+    return {
+	weight: 0,
+	opacity: 1,
+	color: 'white',
+	fillOpacity: 0.5,
+	fillColor: getColor(feature.properties.level)
+    };
+}
+
+highlightFeature = function(e) {
+    var contour = e.target;
+    var tooltip_options = {sticky: true};
+    var tooltip = L.tooltip(tooltip_options);
+    contour.bindTooltip(tooltip).openTooltip();
+    contour.setTooltipContent(contour.feature.properties.level_name);
+}
+
+resetHighlight = function(e) {
+    // pm_layer.resetStyle(e.target);
+    // info.update();
+}
+
+zoomToFeature = function(e) {
+    map.fitBounds(e.target.getBounds());
+}
+
+onEachFeature = function(feature, layer) {
+    layer.on({
+	mouseover: highlightFeature,
+	mouseout: resetHighlight,
+	click: zoomToFeature
+    });
+}
+
+// makeLayer = function(ind) {
+//     var folder = 'data/BUFF/fwd/';
+//     var file = 'height' + ind[1] + '_time' + ind[0] + '.json';
+//     var contour_path = folder + file;    
+//     return L.topoJson(null, {
+// 	style: contourStyle,
+// 	onEachFeature: function(f, l) {onEachFeature(f, l)},
+// 	smoothFactor: .5,
+// 	file_path: contour_path
+//     });
+// }
+
 var run_hysplit = function() {
     var form = $("#hysplit");
     var lat = form.find('input[name="lat"]').val();
@@ -84,44 +142,324 @@ L.topoJson = function (data, options) {
 */
 
 
+// omg this is pure madness
+L.LayerSwitcher = L.LayerGroup.extend({
+    storedLayers: [],
+    values: [],
+    initialize: function(options) {
+	L.LayerGroup.prototype.initialize.call(this, []);
+	this.values = options['values'];
+	this.lazy = options['lazy'] || true;
+	this.dims = this.values.map(function(x) {return x.length});
+	this.ndim = this.dims.length;
+	this.time = 0;
+	this.height = 0;
+	this.setupStorage();
+	if (options['makeLayer']) {
+	    this.makeLayer = options['makeLayer'];
+	}
+    },
+    setupStorage: function() {
+	var arr_len = 1;
+	for (i = 0; i < this.ndim; i++) {
+	    arr_len *= this.dims[i];
+	}
+	this.storedLayers = new Array(arr_len);
+    },
+    indToArrayInd: function(ind) {
+	// get the 1D array index
+	var arr_ind = 0;
+	var dim_n = 1;
+	for (i = this.ndim - 2; i >= 0; i--) {
+	    // gotta jump this.dims[i + 1] times farther for every
+	    // index for this dimension
+	    dim_n *= this.dims[i + 1];
+	    arr_ind += dim_n * ind[i];
+	}
+	// add back that last dimension
+	arr_ind += ind[this.ndim - 1];
+	return arr_ind;
+    },
+    valToArrayInd: function(val) {
+	return this.indToArrayInd(this.getValueIndex(val));
+    },
+    loadLayer: function(ind) {
+	var arr_ind = this.indToArrayInd(ind);
+	if (!this.storedLayers[arr_ind]) {
+	    this.storedLayers[arr_ind] = this.makeLayer(ind);   
+	}
+    },
+    setIndex: function(ind) {
+	this.time = ind[0];
+	this.height = ind[1];
+    },
+    getValueIndex: function(val) {
+	var ind = [];
+	for (i = 0; i < this.ndim; i++) {
+	    ind[i] = this.values[i].indexOf(val[i]);
+	}
+	return ind;
+    },
+    addValue: function(val) {
+	this.loadLayer(this.getValueIndex(val));
+	this.addLayer(this.storedLayers[this.valToArrayInd(val)]);
+    },
+    addIndex: function(ind) {
+	this.loadLayer(ind);
+	this.addLayer(this.storedLayers[this.indToArrayInd(ind)]);
+    },
+    removeIndex: function(ind) {
+	this.removeLayer(this.storedLayers[this.indToArrayInd(ind)]);
+    },
+    removeValue: function(val) {
+	this.removeLayer(this.storedLayers[this.valToArrayInd(val)]);
+    },
+    switchToValue: function(val) {
+	this.clearLayers();
+	this.addValue(val);
+	this.setIndex(this.getValueIndex(val));
+    },
+    switchToIndex: function(ind) {
+	this.clearLayers();
+	this.addIndex(ind);
+	this.setIndex(ind);
+    },
+    // and some special functions just for us
+    switchTimeVal: function(t) {
+	var time_index = this.values[0].indexOf(t);
+	this.switchToIndex([time_index, this.height]);
+    },
+    switchHeight: function(h) {
+	this.switchToIndex([this.time, h]);
+    },
+    loadTime: function(t) {
+	var time_index = this.values[0].indexOf(t);
+	this.loadLayer([time_index, this.height]);
+    },
+});
+
+L.layerSwitcher = function(layers, options) {
+    return new L.LayerSwitcher(layers, options);
+};
+
+
+// based on advice here: https://github.com/socib/Leaflet.TimeDimension/issues/19
+L.TimeDimension.Layer.LayerSwitcher = L.TimeDimension.Layer.extend({
+
+    initialize: function(layer, options) {
+        L.TimeDimension.Layer.prototype.initialize.call(this, layer, options);
+        this._currentLoadedTime = 0;
+        this._currentTimeData = null;
+    },
+
+    onAdd: function(map) {
+	// I think this should be edited somehow to start with the
+	// correct time
+        L.TimeDimension.Layer.prototype.onAdd.call(this, map);
+        // if (this._timeDimension) {
+        //     this._getDataForTime(this._timeDimension.getCurrentTime());
+        // }
+	this._update();
+    },
+
+    _onNewTimeLoading: function(ev) {
+	// ok. Instead of getting data directly, we're going to get
+	// the appropriate layer from site.contours, then call
+	// loadData on it
+        if (!this._map) {
+            return;
+        }
+	// should probably be grabbing data here and firing event on
+	// completion (but this is good enough for now)
+	var time = ev.time;
+	this.fire('timeload', {
+            time: time
+        });
+        return;
+    },
+
+    isReady: function(time) {
+	return true;
+    },
+
+    _update: function() {
+	// switch to the appropriate time
+        if (!this._map)
+            return;
+	this._currentLoadedTime = this._timeDimension.getCurrentTime();
+	this._baseLayer.switchTimeVal(this._currentLoadedTime);
+    }
+});
+
+L.timeDimension.layer.layerSwitcher = function(layer, options) {
+    return new L.TimeDimension.Layer.LayerSwitcher(layer, options);
+};
+
+
+// extending the geojson time dimension layer to allow backward
+// trajectories
+L.TimeDimension.Layer.GeoJson2 = L.TimeDimension.Layer.GeoJson.extend({
+    initialize: function(layer, options) {
+	this.fwd = !!options['fwd'];
+        L.TimeDimension.Layer.GeoJson.prototype.initialize.call(this, layer, options);
+    },
+    _update: function() {
+        if (!this._map)
+            return;
+        if (!this._loaded) {
+            return;
+        }
+
+        var time = this._timeDimension.getCurrentTime();
+
+	if (this.fwd) {
+	    var maxTime = this._timeDimension.getCurrentTime(),
+		minTime = 0;
+            if (this._duration) {
+		var date = new Date(maxTime);
+		L.TimeDimension.Util.subtractTimeDuration(date, this._duration, true);
+		minTime = date.getTime();
+            }
+	} else {
+	    var minTime = this._timeDimension.getCurrentTime(),
+		maxTime = new Date(Math.max.apply(null, this._availableTimes));
+	}
+
+
+        // new coordinates:
+        var layer = L.geoJson(null, this._baseLayer.options);
+        var layers = this._baseLayer.getLayers();
+        for (var i = 0, l = layers.length; i < l; i++) {
+            var feature = this._getFeatureBetweenDates(layers[i].feature, minTime, maxTime);
+            if (feature) {
+                layer.addData(feature);
+                if (this._addlastPoint && feature.geometry.type == "LineString") {
+                    if (feature.geometry.coordinates.length > 0) {
+                        var properties = feature.properties;
+                        properties.last = true;
+                        layer.addData({
+                            type: 'Feature',
+                            properties: properties,
+                            geometry: {
+                                type: 'Point',
+                                coordinates: feature.geometry.coordinates[feature.geometry.coordinates.length - 1]
+                            }
+                        });
+                    }
+                }
+            }
+        }
+
+        if (this._currentLayer) {
+            this._map.removeLayer(this._currentLayer);
+        }
+        if (layer.getLayers().length) {
+            layer.addTo(this._map);
+            this._currentLayer = layer;
+        }
+    },
+    _getFeatureBetweenDates: function(feature, minTime, maxTime) {
+        var featureStringTimes = this._getFeatureTimes(feature);
+        if (featureStringTimes.length == 0) {
+            return feature;
+        }
+        var featureTimes = [];
+        for (var i = 0, l = featureStringTimes.length; i < l; i++) {
+            var time = featureStringTimes[i]
+            if (typeof time == 'string' || time instanceof String) {
+                time = Date.parse(time.trim());
+            }
+            featureTimes.push(time);
+        }
+	var index_min = null,
+            index_max = null,
+            l = featureTimes.length;
+	if (this.fwd) {
+	    if (featureTimes[0] > maxTime || featureTimes[l - 1] < minTime) {
+		return null;
+            }
+            if (featureTimes[l - 1] > minTime) {
+		for (var i = 0; i < l; i++) {
+                    if (index_min === null && featureTimes[i] > minTime) {
+			// set index_min the first time that current time is greater the minTime
+			index_min = i;
+                    }
+                    if (featureTimes[i] > maxTime) {
+			index_max = i;
+			break;
+                    }
+		}
+            }
+	} else {
+	    // the times are backward
+	    if (featureTimes[l - 1] > maxTime || featureTimes[0] < minTime) {
+		return null;
+            }
+            if (featureTimes[l - 1] < maxTime) {
+		for (var i = 0; i < l; i++) {
+                    if (index_min === null && featureTimes[i] <= maxTime) {
+			// set index_min the first time that current time is less than the maxTime
+			index_min = i;
+                    }
+                    if (featureTimes[i] < minTime) {
+			index_max = i;
+			break;
+                    }
+		}
+            }
+	}
+
+        if (index_min === null) {
+            index_min = 0;
+        }
+        if (index_max === null) {
+            index_max = l;
+        }
+        var new_coordinates = [];
+        if (feature.geometry.coordinates[0].length) {
+            new_coordinates = feature.geometry.coordinates.slice(index_min, index_max);
+        } else {
+            new_coordinates = feature.geometry.coordinates;
+        }
+        return {
+            type: 'Feature',
+            properties: feature.properties,
+            geometry: {
+                type: feature.geometry.type,
+                coordinates: new_coordinates
+            }
+        };
+    }
+});
+
+L.timeDimension.layer.geoJson2 = function(layer, options) {
+    return new L.TimeDimension.Layer.GeoJson2(layer, options);
+};
+
+
 class Site {
     // this object holds all of the site-specific objects
     constructor(name, fwd, hysplit) {
 	this.name = name;
 	this.fwd = fwd;
 	this._hysplit = hysplit;
+	this.contour_layer = this._hysplit.contour_layer;
+	this.trajectory_layer = this._hysplit.trajectory_layer;
 	// start at time and height = 0
 	this.time = 0;
 	this.height = 0;
 	this.data;
 	this.times;
 	this.heights;
-	// a 2D (times.length x heights.length) array of contour
-	// layers
+	// a layerSwitcher layer with contour topojson layers
 	this.contours;
-	// the full geojson trajectory
+	// 
 	this.trajectory;
-	this.trajectory_timedim;
-	// a 1D (times.length) array of trajectory layers
-	this.trajectories;
-	this.contour_layer = this._hysplit.contour_layer;
-	this.trajectory_layer = this._hysplit.trajectory_layer;
 	this.getColor = this._hysplit.getColor;
 	this.time_slider;
 	this.height_slider;
+	this.td_layer;
     }
-
-    // move this to a time layer class!
-    // // do some stuff so this maybe could be used as a time layer
-    // isReady() {
-    // 	return true;
-    // }
-
-    // _update() {
-    // 	var time = this._timeDimension.getCurrentTime();
-    // 	var t = this.times.indexOf(time);
-    // 	this.changeTime(t);
-    // }
 
     get folder() {
 	// get the path to the metadata json for this site
@@ -170,72 +508,12 @@ class Site {
 	});
     }
 
-    makeContours() {
-	this.contours = [];
-	var layers;
-	var layer;
-	var contour_path;
-	var this2 = this;
-	// can't believe I actually have to define this here. Dumb.
-	var contourStyle = function(feature) {
-	    return {
-		weight: 0,
-		opacity: 1,
-		color: 'white',
-		fillOpacity: 0.5,
-		fillColor: this2.getColor(feature.properties.level)
-	    };
-	}
-	for (var i=0; i<this.times.length; i++) {
-	    layers = [];
-	    // loop through times in the first dimension
-	    for (var j=0; j<this.heights.length; j++) {
-		// loop through heights in the second dimension
-		contour_path = this.contour_path(i, j);
-		layer = L.topoJson(null, {
-		    style: contourStyle,
-		    onEachFeature: function(f, l) {this2.onEachFeature(f, l)},
-		    smoothFactor: .5,
-		    file_path: contour_path
-		});
-		layers.push(layer);
-	    }
-	    this.contours.push(layers);
-	}
-    }
-
     trajStyle(feature) {
 	return {
 	    weight: 3,
 	    opacity: .6,
 	    color: '#5075DB'
 	};
-    }
-
-    makeTrajectories() {
-	if (!this.trajectory['coordinates']) {
-	    // give up if there's no trajectory
-	    return null;
-	}
-	this.trajectories = [];
-	var layer;
-	var traj_subset;
-	var line_coords = this.trajectory['coordinates'];
-	for (var t=0; t<this.times.length; t++) {
-	    // loop through times
-	    traj_subset = {'type': 'LineString'};
-	    if (this.fwd) {
-		traj_subset['coordinates'] = line_coords.slice(0, parseInt(t) + 2);
-	    } else {
-		traj_subset['coordinates'] =
-		    line_coords.slice(0, line_coords.length - (parseInt(t))).reverse();
-	    }
-	    layer = L.geoJSON(traj_subset, {
-		style: this.trajStyle,
-		smoothFactor: 1
-	    });
-	    this.trajectories.push(layer);
-	}
     }
 
     loadData() {
@@ -246,41 +524,60 @@ class Site {
 	    this2.data = json;
 	    this2.times = json['times'].map(function(text) {return new Date(text)});
 	    this2.heights = json['heights'];
-	    this2.makeContours();
-	    this2.timedim = L.timeDimension({times: this2.times});
+	    // this2.makeContours();
+	    var timedim_options = {times: this2.times,
+				   currentTime: this2.times[0]};
+	    this2.timedim = L.timeDimension(timedim_options);
 	    try {
 		// get the trajectory if it exists
-		this2.trajectory = json['trajectory'];
-		var trajectory2;
+		// this2.trajectory = json['trajectory'];
+		var trajectory_geom;
+		trajectory_geom = {type: 'Feature'};
+		trajectory_geom['geometry'] = json['trajectory'];
+		trajectory_geom['properties'] = {};
+		// dealing with times
 		var t0 = this2.times[0];
 		var t1 = new Date(t0.getTime());
 		var times2 = this2.times.slice();
 		t1.setHours(t0.getHours() - 1);
 		times2.unshift(t1);
-		this2.trajectory2 = {type: 'Feature'};
-		this2.trajectory2['geometry'] = json['trajectory'];
-		this2.trajectory2['properties'] = {};
-		this2.trajectory2['properties']['times'] = times2;
-		trajectory2 = L.geoJSON(this2.trajectory2, {
+		if (this2.fwd) {
+		    trajectory_geom['properties']['times'] = times2;
+		} else {
+		    trajectory_geom['properties']['times'] = times2.reverse();
+		}
+		var trajectory_layer = L.geoJSON(trajectory_geom, {
 		    style: this2.trajStyle,
 		    smoothFactor: 1
 		});
-		var traj_options = {timeDimension: this2.timedim};
-		this2.trajectory_timedim = L.timeDimension.layer.geoJson(trajectory2, traj_options);
-		this2.makeTrajectories();
+		var traj_options = {timeDimension: this2.timedim,
+				    fwd: this2.fwd};
+		this2.trajectory = L.timeDimension.layer.geoJson2(trajectory_layer, traj_options);
 	    } catch(err) {}
+	    var folder = this2.folder;
+	    var makeLayer = function(ind) {
+		// var folder = 'data/BUFF/fwd/';
+		var file = 'height' + ind[1] + '_time' + ind[0] + '.json';
+		var contour_path = folder + file;    
+		return L.topoJson(null, {
+		    style: contourStyle,
+		    onEachFeature: function(f, l) {onEachFeature(f, l)},
+		    smoothFactor: .5,
+		    file_path: contour_path
+		});
+	    }
+	    var ls_options = {values: [this2.times, this2.heights],
+			      makeLayer: makeLayer};
+	    this2.contours = L.layerSwitcher(ls_options);
+	    var td_options = {timeDimension: this2.timedim};
+	    this2.td_layer = L.timeDimension.layer.layerSwitcher(this2.contours, td_options);
 	});
     }
 
     displayData(time, height) {
-	this.contour_layer.clearLayers();
-	this.contour_layer.addLayer(this.contours[time][height]);
-	this.trajectory_layer.clearLayers();
-	if (this.trajectories) {
-	    this.trajectory_layer.addLayer(this.trajectories[time]);
-	}
+	this.contours.switchToIndex([time, parseInt(height)]);
 	this.time = time;
-	this.height = height;
+	this.height = parseInt(height);
     }
 
     changeTime(time) {
@@ -293,7 +590,8 @@ class Site {
 
     create_time_slider() {
 	var time_options = {timeDimension: this.timedim, loopButton: true,
-			    timeSliderDragUpdate: true};
+			    timeSliderDragUpdate: true,
+			    playerOptions: {minBufferReady: 0, buffer: 0}};
 	this.time_slider = L.control.timeDimension(time_options);
     }
 
@@ -328,12 +626,14 @@ class Site {
     clearLayers() {
 	this.contour_layer.clearLayers();
 	this.trajectory_layer.clearLayers();
+	this.timedim.remove();
     }
 
     addTo(map) {
 	this.setup_sliders(map);
-	this.trajectory_timedim.addTo(map);
-	// this.displayData(this.time, this.height);
+	this.contour_layer.addLayer(this.contours);
+	this.trajectory_layer.addLayer(this.trajectory);
+	this.td_layer.addTo(map);
     }
 
     remove() {
