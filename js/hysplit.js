@@ -83,13 +83,15 @@ L.TopoJSON = L.GeoJSON.extend({
     loadData: function(url) {
 	// load the data if needed
 	if (!this.dataIsLoaded) {
+	    this.dataIsLoaded = true;
 	    var topo = this;
-	    $.getJSON(this.options.file_path, function(gjson) {
+	    return $.getJSON(this.options.file_path, function(gjson) {
 		topo.initialize(gjson, topo.options);
-		topo.dataIsLoaded = true;
-		return null;
+		// topo.dataIsLoaded = true;
 	    });
-	};
+	} else {
+	    return $.when();
+	}
     },
     addTo: function (map) {
 	// make sure data is loaded before adding to map
@@ -132,7 +134,7 @@ L.topoJson = function (data, options) {
 
 // omg this is pure madness
 L.LayerSwitcher = L.LayerGroup.extend({
-    storedLayers: [],
+    cache: [],
     values: [],
     initialize: function(options) {
 	L.LayerGroup.prototype.initialize.call(this, []);
@@ -142,17 +144,17 @@ L.LayerSwitcher = L.LayerGroup.extend({
 	this.ndim = this.dims.length;
 	this.time = 0;
 	this.height = 0;
-	this.setupStorage();
+	this.setupCache();
 	if (options['makeLayer']) {
 	    this.makeLayer = options['makeLayer'];
 	}
     },
-    setupStorage: function() {
+    setupCache: function() {
 	var arr_len = 1;
 	for (i = 0; i < this.ndim; i++) {
 	    arr_len *= this.dims[i];
 	}
-	this.storedLayers = new Array(arr_len);
+	this.cache = new Array(arr_len);
     },
     indToArrayInd: function(ind) {
 	// get the 1D array index
@@ -173,8 +175,11 @@ L.LayerSwitcher = L.LayerGroup.extend({
     },
     loadLayer: function(ind) {
 	var arr_ind = this.indToArrayInd(ind);
-	if (!this.storedLayers[arr_ind]) {
-	    this.storedLayers[arr_ind] = this.makeLayer(ind);   
+	if (!this.cache[arr_ind]) {
+	    this.cache[arr_ind] = this.makeLayer(ind);
+	    return this.cache[arr_ind].loadData();
+	} else {
+	    return $.when();
 	}
     },
     setIndex: function(ind) {
@@ -190,17 +195,17 @@ L.LayerSwitcher = L.LayerGroup.extend({
     },
     addValue: function(val) {
 	this.loadLayer(this.getValueIndex(val));
-	this.addLayer(this.storedLayers[this.valToArrayInd(val)]);
+	this.addLayer(this.cache[this.valToArrayInd(val)]);
     },
     addIndex: function(ind) {
 	this.loadLayer(ind);
-	this.addLayer(this.storedLayers[this.indToArrayInd(ind)]);
+	this.addLayer(this.cache[this.indToArrayInd(ind)]);
     },
     removeIndex: function(ind) {
-	this.removeLayer(this.storedLayers[this.indToArrayInd(ind)]);
+	this.removeLayer(this.cache[this.indToArrayInd(ind)]);
     },
     removeValue: function(val) {
-	this.removeLayer(this.storedLayers[this.valToArrayInd(val)]);
+	this.removeLayer(this.cache[this.valToArrayInd(val)]);
     },
     switchToValue: function(val) {
 	this.clearLayers();
@@ -222,7 +227,7 @@ L.LayerSwitcher = L.LayerGroup.extend({
     },
     loadTime: function(t) {
 	var time_index = this.values[0].indexOf(t);
-	this.loadLayer([time_index, this.height]);
+	return this.loadLayer([time_index, this.height]);
     },
 });
 
@@ -260,9 +265,12 @@ L.TimeDimension.Layer.LayerSwitcher = L.TimeDimension.Layer.extend({
 	// should probably be grabbing data here and firing event on
 	// completion (but this is good enough for now)
 	var time = ev.time;
-	this.fire('timeload', {
-            time: time
-        });
+	var this2 = this;
+	this._baseLayer.loadTime(time).done(function() {
+	    this2.fire('timeload', {
+		time: time
+            });
+	});
         return;
     },
 
@@ -441,11 +449,11 @@ class Site {
 	this.heights;
 	// a layerSwitcher layer with contour topojson layers
 	this.contours;
-	// 
 	this.trajectory;
 	this.getColor = this._hysplit.getColor;
 	this.time_slider;
 	this.height_slider;
+	this.timedim;
 	this.td_layer;
     }
 
@@ -574,7 +582,8 @@ class Site {
 
     changeHeight(height) {
 	var units;
-	this.displayData(this.time, height);
+	var time = this.times.indexOf(this.timedim.getCurrentTime());
+	this.displayData(time, height);
 	if (height > 0) {
 	    units = 'ng/m<sup>3</sup>';
 	} else {
@@ -585,8 +594,7 @@ class Site {
 
     create_time_slider() {
 	var time_options = {timeDimension: this.timedim, loopButton: true,
-			    timeSliderDragUpdate: true,
-			    playerOptions: {minBufferReady: 0, buffer: 0}};
+			    timeSliderDragUpdate: true};
 	this.time_slider = L.control.timeDimension(time_options);
     }
 
