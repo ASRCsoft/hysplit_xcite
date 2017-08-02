@@ -49,18 +49,6 @@ onEachFeature = function(feature, layer) {
     });
 }
 
-// makeLayer = function(ind) {
-//     var folder = 'data/BUFF/fwd/';
-//     var file = 'height' + ind[1] + '_time' + ind[0] + '.json';
-//     var contour_path = folder + file;    
-//     return L.topoJson(null, {
-// 	style: contourStyle,
-// 	onEachFeature: function(f, l) {onEachFeature(f, l)},
-// 	smoothFactor: .5,
-// 	file_path: contour_path
-//     });
-// }
-
 var run_hysplit = function() {
     var form = $("#hysplit");
     var lat = form.find('input[name="lat"]').val();
@@ -585,7 +573,14 @@ class Site {
     }
 
     changeHeight(height) {
+	var units;
 	this.displayData(this.time, height);
+	if (height > 0) {
+	    units = 'ng/m<sup>3</sup>';
+	} else {
+	    units = 'ng/m<sup>2</sup>';
+	}
+	$.each($('._units_here'), function(i, x) {x.innerHTML = units});
     };
 
     create_time_slider() {
@@ -830,11 +825,10 @@ class Hysplit {
 	    for (var i = grades.length - 1; i >= 0; i--) {
 		from = grades[i];
 		to = grades[i + 1];
-		labels.push('<span id="ng' + from + '">' +
-			    '<i style="background:' + this2.getColor(from) + '"></i> <b>' +
+		labels.push('<i style="background:' + this2.getColor(from) + '"></i> <b>' +
 			    '10<sup>' + from + '</sup>' +
 			    (i + 1 < grades.length ? '&ndash;10<sup>' + to + '</sup>' : '+') +
-			    '</b> ng/m<sup>3</sup></span>');
+			    '</b> <span class="_units_here">ng/m<sup>2</sup></span>');
 	    }
 	    div.innerHTML = legend_title + labels.join('<br>');
 	    return div;
