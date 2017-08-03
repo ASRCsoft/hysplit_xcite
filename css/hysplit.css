@@ -49,3 +49,14 @@ body {margin: 0}
 .easy-button-button .button-state {
     display: inline;
 }
+
+/* fix superscript line heights- taken from
+https://css-tricks.com/snippets/css/prevent-superscripts-and-subscripts-from-affecting-line-height/ */
+sup, sub {
+    vertical-align: baseline;
+    position: relative;
+    top: -0.4em;
+}
+sub { 
+    top: 0.4em; 
+}
