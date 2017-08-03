@@ -32,6 +32,25 @@ highlightFeature = function(e) {
     contour.setTooltipContent(contour.feature.properties.level_name);
 }
 
+highlightTrajectory = function(e) {
+    var trajectory = e.target;
+    var tooltip = L.tooltip();
+    trajectory.bindTooltip(tooltip).openTooltip();
+    // see if this trajectory is forward or backward
+    var ncoords = trajectory.feature.properties.times.length;
+    var tstart = new Date(trajectory.feature.properties.times[0]);
+    var tend = new Date(trajectory.feature.properties.times[ncoords - 1]);
+    var fwd = tstart < tend;
+    var startend;
+    if (fwd) {
+	startend = 'starting';
+    } else {
+	startend = 'ending';
+    }
+    var text = 'Trajectory ' + startend + ' at ' + tstart;
+    trajectory.setTooltipContent(text);
+}
+
 resetHighlight = function(e) {
     // pm_layer.resetStyle(e.target);
     // info.update();
@@ -46,6 +65,14 @@ onEachFeature = function(feature, layer) {
 	mouseover: highlightFeature,
 	mouseout: resetHighlight,
 	click: zoomToFeature
+    });
+}
+
+onEachTrajectory = function(feature, layer) {
+    layer.on({
+	mouseover: highlightTrajectory
+	// mouseout: resetHighlight,
+	// click: zoomToFeature
     });
 }
 
@@ -449,7 +476,7 @@ class Site {
 	this.heights;
 	// a layerSwitcher layer with contour topojson layers
 	this.contours;
-	this.trajectory;
+	this.trajectories;
 	this.getColor = this._hysplit.getColor;
 	this.time_slider;
 	this.height_slider;
@@ -516,6 +543,10 @@ class Site {
 	// load the site's metadata
 	var this2 = this;
 	// return this so it can be used as a promise
+	var json;
+	$.get(this.meta_path, function(json2) {
+	    json = json2;
+	})
 	return $.get(this.meta_path, function(json) {
 	    this2.data = json;
 	    this2.times = json['times'].map(function(text) {return new Date(text)});
@@ -526,33 +557,19 @@ class Site {
 	    this2.timedim = L.timeDimension(timedim_options);
 	    try {
 		// get the trajectory if it exists
-		// this2.trajectory = json['trajectory'];
-		var trajectory_geom;
-		trajectory_geom = {type: 'Feature'};
-		trajectory_geom['geometry'] = json['trajectory'];
-		trajectory_geom['properties'] = {};
-		// dealing with times
-		var t0 = this2.times[0];
-		var t1 = new Date(t0.getTime());
-		var times2 = this2.times.slice();
-		t1.setHours(t0.getHours() - 1);
-		times2.unshift(t1);
-		if (this2.fwd) {
-		    trajectory_geom['properties']['times'] = times2;
-		} else {
-		    trajectory_geom['properties']['times'] = times2.reverse();
-		}
-		var trajectory_layer = L.geoJSON(trajectory_geom, {
+		var trajectories;
+		trajectories = json['trajectories'];
+		var trajectory_layer = L.geoJSON(trajectories, {
 		    style: this2.trajStyle,
+		    onEachFeature: onEachTrajectory,
 		    smoothFactor: 1
 		});
 		var traj_options = {timeDimension: this2.timedim,
 				    fwd: this2.fwd};
-		this2.trajectory = L.timeDimension.layer.geoJson2(trajectory_layer, traj_options);
+		this2.trajectories = L.timeDimension.layer.geoJson2(trajectory_layer, traj_options);
 	    } catch(err) {}
 	    var folder = this2.folder;
 	    var makeLayer = function(ind) {
-		// var folder = 'data/BUFF/fwd/';
 		var file = 'height' + ind[1] + '_time' + ind[0] + '.json';
 		var contour_path = folder + file;    
 		return L.topoJson(null, {
@@ -635,7 +652,7 @@ class Site {
     addTo(map) {
 	this.setup_sliders(map);
 	this.contour_layer.addLayer(this.contours);
-	this.trajectory_layer.addLayer(this.trajectory);
+	this.trajectory_layer.addLayer(this.trajectories);
 	this.td_layer.addTo(map);
     }
 
@@ -898,8 +915,8 @@ class Hysplit {
     addLayerControl() {
 	var this2 = this;
 	var overlayMaps = {
-	    'Contour': this2.contour_layer,
-	    'Trajectory': this2.trajectory_layer
+	    'Contours': this2.contour_layer,
+	    'Trajectories': this2.trajectory_layer
 	}
 	L.control.layers(null, overlayMaps, {position: 'topleft'}).addTo(this.map);
     }
@@ -918,6 +935,29 @@ class Hysplit {
 	    }]
 	});
 	b1.addTo(h1.map);
+    }
+
+    addSlider2() {
+	var this2 = this;
+	var slider = L.control({position: 'bottomleft'});
+	slider.onAdd = function (map) {
+	    var div = L.DomUtil.create('div', 'height_slider'),
+		grades = levels,
+		labels = [];
+	    var range_title = '<h4>Height</h4>'
+	    var range = '<input orient="vertical" title="Select Height" id="height_slider" type="range" list="height_labels" style="width: 64px;">'
+	    var datalist = '<datalist id="height_labels">'
+	    var heights = {0: 'Deposition',
+			   1: '0-150m',
+			   2: '150-300m'}
+	    $.each(heights, function(i, x) {
+		datalist += '<option value="' + i + '" label="' + x + '"></option>';
+	    });
+	    datalist += '</datalist>';
+	    div.innerHTML = range_title + range + datalist;
+	    return div;
+	};
+	slider.addTo(this.map);
     }
 
     initialize(divid) {
@@ -939,6 +979,7 @@ class Hysplit {
 	    this2.addFwdButton();
 	    this2.cur_site.loadData().done(function() {
 		this2.cur_site.addTo(this2.map);
+		// this2.addSlider2();
 	    });
 	});
     }
