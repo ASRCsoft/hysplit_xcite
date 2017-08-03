@@ -460,6 +460,30 @@ L.timeDimension.layer.geoJson2 = function(layer, options) {
 };
 
 
+// and while I'm here...
+
+// an empty layer that turns things off and on
+// omg this is pure madness
+L.FakeLayer = L.LayerGroup.extend({
+    initialize: function(options) {
+	this.hysplit = options['hysplit'];
+	this.fwd = options['fwd'];
+	L.LayerGroup.prototype.initialize.call(this, []);
+    },
+    onAdd: function() {
+	// L.LayerGroup.prototype.addLayer.call(this);
+	var cur_fwd = this.hysplit.cur_site.fwd;
+	if (cur_fwd != this.fwd) {
+	    this.hysplit.changeSite(this.hysplit.cur_site.name, this.fwd);
+	}
+    }
+});
+
+L.fakeLayer = function(options) {
+    return new L.FakeLayer(options);
+};
+
+
 class Site {
     // this object holds all of the site-specific objects
     constructor(name, fwd, hysplit) {
@@ -639,8 +663,12 @@ class Site {
     };
 
     remove_sliders() {
-	this.time_slider.remove();
-	this.height_slider.remove();
+	try {
+	    this.time_slider.remove();
+	} catch(err) {}
+	try {
+	    this.height_slider.remove();	    
+	} catch(err) {}
     }
 
     clearLayers() {
@@ -658,7 +686,9 @@ class Site {
 
     remove() {
 	this.remove_sliders();
-	this.clearLayers();
+	try {
+	    this.clearLayers();   
+	} catch(err) {}
     }
 }
 
@@ -798,7 +828,10 @@ class Hysplit {
 	this.sites;
 	this.cached_sites = {};
 	this.site_map;
-	this.origin_circle;	
+	this.origin_circle;
+	// make two fakelayers (fwd and bck) to include in the layer controller
+	this.fwd_layer = L.fakeLayer({hysplit: this, fwd: true});
+	this.bck_layer = L.fakeLayer({hysplit: this, fwd: false});
     }
 
     get_sites() {
@@ -914,11 +947,15 @@ class Hysplit {
 
     addLayerControl() {
 	var this2 = this;
+	var baseMaps = {
+	    'Forward': this2.fwd_layer,
+	    'Backward': this2.bck_layer
+	}
 	var overlayMaps = {
 	    'Contours': this2.contour_layer,
 	    'Trajectories': this2.trajectory_layer
 	}
-	L.control.layers(null, overlayMaps, {position: 'topleft'}).addTo(this.map);
+	L.control.layers(baseMaps, overlayMaps, {position: 'topleft'}).addTo(this.map);
     }
 
     addFwdButton() {
@@ -968,7 +1005,7 @@ class Hysplit {
 	    site_name = this2.cur_site.name;
 	    site_fwd = this2.cur_site.fwd;
 	    this2.cached_sites[site_name][site_fwd] = this2.cur_site;
-	    this2.map = L.map(divid, {layers: [this2.contour_layer, this2.trajectory_layer]}).
+	    this2.map = L.map(divid, {layers: [this2.fwd_layer, this2.contour_layer, this2.trajectory_layer]}).
 		setView([43, -74.5], 7);
 	    this2.addTileLayer();
 	    this2.addLegend();
@@ -976,7 +1013,7 @@ class Hysplit {
 	    this2.origin_layer.addTo(this2.map);
 	    this2.addSimInfo();
 	    this2.addLayerControl();
-	    this2.addFwdButton();
+	    // this2.addFwdButton();
 	    this2.cur_site.loadData().done(function() {
 		this2.cur_site.addTo(this2.map);
 		// this2.addSlider2();
@@ -985,34 +1022,40 @@ class Hysplit {
     }
 
     changeSite(name, fwd) {
-	var this2 = this;
-	var site;
-	if (!this.cached_sites[name][fwd]) {
-	    site = new Site(name, fwd, this);
-	    this.cached_sites[name][fwd] = site;
-	    site.loadData().done(function() {
-		this2.cur_site.remove();
-		this2.cur_site = this2.cached_sites[name][fwd];
-		this2.cur_site.addTo(this2.map);
-	    });
-	} else {
-	    this.cur_site.remove();
-	    this.cur_site = this.cached_sites[name][fwd];
-	    this.cur_site.addTo(this.map);
+	var cur_name = this.cur_site.name;
+	var cur_fwd = this.cur_site.fwd;
+	if (cur_name != name || cur_fwd != fwd) {
+	    var this2 = this;
+	    var site;
+	    if (!this.cached_sites[name][fwd]) {
+		// get the site data
+		site = new Site(name, fwd, this);
+		this.cached_sites[name][fwd] = site;
+		site.loadData().done(function() {
+		    this2.cur_site.remove();
+		    this2.cur_site = this2.cached_sites[name][fwd];
+		    this2.cur_site.addTo(this2.map);
+		});
+	    } else {
+		// use the cached version
+		this.cur_site.remove();
+		this.cur_site = this.cached_sites[name][fwd];
+		this.cur_site.addTo(this.map);
+	    }
+	    // update the simulation info
+	    var fwd_text;
+	    // flip the forward text
+	    if (cur_fwd) {
+		fwd_text = 'Backward';
+	    } else {
+		fwd_text = 'Forward';
+	    }
+	    $('#_fwd_here').text(fwd_text);
 	}
     }
 
     changeFwd() {
 	var cur_fwd = this.cur_site.fwd;
 	this.changeSite(this.cur_site.name, !this.cur_site.fwd);
-	// update the simulation info
-	var fwd_text;
-	// flip the forward text
-	if (cur_fwd) {
-	    fwd_text = 'Backward';
-	} else {
-	    fwd_text = 'Forward';
-	}
-	$('#_fwd_here').text(fwd_text);
     }
 }
