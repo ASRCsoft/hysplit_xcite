@@ -514,7 +514,7 @@ class Site {
 	if (this.fwd) {
 	    fwd_folder = 'fwd/';
 	} else {
-	    fwd_folder = 'bck/';
+	    fwd_folder = 'bwd/';
 	}
 	return 'data/' + this.name + '/' + fwd_folder;
     }
@@ -642,13 +642,20 @@ class Site {
     create_height_slider() {
 	var heights = this.heights;
 	var this2 = this;
-	this.height_slider = L.control.slider(function(h) {this2.changeHeight(h);},
-					      {id: 'height_slider', orientation: 'vertical',
-					       title: 'Select Height', value: 0,
-					       max: heights.length - 1, position: 'bottomleft',
-					       logo: 'Height', size: '100px', collapsed: false,
-					       getValue: function(height) {return heights[height] + 'm';},
-					       syncSlider: true });
+	var getValue = function(h) {
+	    if (h == 0) {
+		return 'Deposition';
+	    } else {
+		return heights[h - 1] + '-' + heights[h] + 'm';
+	    }
+	}
+	var slider_options = {id: 'height_slider',
+			      title: 'Select Height', value: 0,
+			      max: heights.length - 1, position: 'bottomleft',
+			      logo: 'Height', size: '100px', collapsed: false,
+			      orientation: 'vertical',
+			      getValue: getValue, increment: true, syncSlider: true};
+	this.height_slider = L.control.slider(function(h) {this2.changeHeight(h);}, slider_options);
     };
 
     setup_sliders(map) {
@@ -958,43 +965,44 @@ class Hysplit {
 	L.control.layers(baseMaps, overlayMaps, {position: 'topleft'}).addTo(this.map);
     }
 
-    addFwdButton() {
-	var this2 = this;
-	var switchFwd = function(btn, map) {
-	    this2.changeFwd();
-	}
-	// var b1 = L.easyButton('fa-exchange', switchFwd);
-	var b1 = L.easyButton({
-	    states: [{
-		icon: 'fa-exchange',
-		title: 'Toggle forward and backward trajectories',
-		onClick: switchFwd
-	    }]
-	});
-	b1.addTo(h1.map);
-    }
-
     addSlider2() {
 	var this2 = this;
 	var slider = L.control({position: 'bottomleft'});
+	this.slider2 = slider;
 	slider.onAdd = function (map) {
-	    var div = L.DomUtil.create('div', 'height_slider'),
-		grades = levels,
+	    this._div = L.DomUtil.create('div', 'info');
+	    var grades = levels,
 		labels = [];
 	    var range_title = '<h4>Height</h4>'
-	    var range = '<input orient="vertical" title="Select Height" id="height_slider" type="range" list="height_labels" style="width: 64px;">'
-	    var datalist = '<datalist id="height_labels">'
-	    var heights = {0: 'Deposition',
-			   1: '0-150m',
-			   2: '150-300m'}
-	    $.each(heights, function(i, x) {
-		datalist += '<option value="' + i + '" label="' + x + '"></option>';
-	    });
-	    datalist += '</datalist>';
-	    div.innerHTML = range_title + range + datalist;
-	    return div;
+	    var range = '<div id="height_slider2"></div>'
+	    // var range = '<input orient="vertical" title="Select Height" id="height_slider" type="range" list="height_labels" style="width: 64px;">'
+	    // var datalist = '<datalist id="height_labels">'
+	    // var heights = {0: 'Deposition',
+	    // 		   1: '0-150m',
+	    // 		   2: '150-300m'}
+	    // $.each(heights, function(i, x) {
+	    // 	datalist += '<option value="' + i + '" label="' + x + '"></option>';
+	    // });
+	    // datalist += '</datalist>';
+	    // div.innerHTML = range_title + range + datalist;
+	    this._div.innerHTML = range_title + range;
+	    return this._div;
 	};
 	slider.addTo(this.map);
+	var slider_options = {max: 2, tickInterval: 1,
+			      tickLabels: {0: 'Deposition', 1: '0-150m', 2: '150-300m'},
+			      orientation: 'vertical' };
+	// Disable dragging when user's cursor enters the element
+	// courtesy of https://gis.stackexchange.com/a/104609
+	var map = this.map;
+	slider.getContainer().addEventListener('mouseover', function () {
+            map.dragging.disable();
+	});
+	// Re-enable dragging when user's cursor leaves the element
+	slider.getContainer().addEventListener('mouseout', function () {
+            map.dragging.enable();
+	});
+	$('#height_slider2').labeledslider(slider_options);
     }
 
     initialize(divid) {
@@ -1013,7 +1021,6 @@ class Hysplit {
 	    this2.origin_layer.addTo(this2.map);
 	    this2.addSimInfo();
 	    this2.addLayerControl();
-	    // this2.addFwdButton();
 	    this2.cur_site.loadData().done(function() {
 		this2.cur_site.addTo(this2.map);
 		// this2.addSlider2();
