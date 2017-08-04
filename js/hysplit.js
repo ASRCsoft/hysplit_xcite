@@ -472,9 +472,9 @@ L.FakeLayer = L.LayerGroup.extend({
     },
     onAdd: function() {
 	// L.LayerGroup.prototype.addLayer.call(this);
-	var cur_fwd = this.hysplit.cur_site.fwd;
+	var cur_fwd = this.hysplit.cur_fwd;
 	if (cur_fwd != this.fwd) {
-	    this.hysplit.changeSite(this.hysplit.cur_site.name, this.fwd);
+	    this.hysplit.changeSite(this.hysplit.cur_name, this.fwd);
 	}
     }
 });
@@ -833,7 +833,9 @@ class Hysplit {
 	this.contour_layer = L.layerGroup([]);
 	this.trajectory_layer = L.layerGroup([]);
 	this.origin_layer = L.layerGroup([]);
-	this.cur_site = new Site(start_site_name, start_site_fwd, this);
+	this.cur_name = start_site_name;
+	this.cur_fwd = start_site_fwd;
+	this.cur_site = new Site(this.cur_name, this.cur_fwd, this);
 	this.map;
 	this.sites;
 	this.cached_sites = {};
@@ -1032,20 +1034,21 @@ class Hysplit {
     }
 
     changeSite(name, fwd) {
-	var cur_name = this.cur_site.name;
-	var cur_fwd = this.cur_site.fwd;
-	if (cur_name != name || cur_fwd != fwd) {
+	if (this.cur_name != name || this.cur_fwd != fwd) {
+	    this.cur_name = name;
+	    this.cur_fwd = fwd;
 	    if (!this.cached_sites[name][fwd]) {
 		// get the site data
 		var this2 = this;
 		var site;
 		site = new Site(name, fwd, this);
 		this.cached_sites[name][fwd] = site;
-		site.loadData().done(function() {
+		var f = function() {
 		    this2.cur_site.remove();
 		    this2.cur_site = this2.cached_sites[name][fwd];
 		    this2.cur_site.addTo(this2.map);
-		});
+		};
+		site.loadData().then(f).fail(f);
 	    } else {
 		// use the cached version
 		this.cur_site.remove();
@@ -1055,7 +1058,7 @@ class Hysplit {
 	    // update the simulation info
 	    var fwd_text;
 	    // flip the forward text
-	    if (cur_fwd) {
+	    if (this.cur_fwd) {
 		fwd_text = 'Backward';
 	    } else {
 		fwd_text = 'Forward';
