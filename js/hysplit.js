@@ -1059,9 +1059,9 @@ class Hysplit {
 	    var fwd_text;
 	    // flip the forward text
 	    if (this.cur_fwd) {
-		fwd_text = 'Backward';
-	    } else {
 		fwd_text = 'Forward';
+	    } else {
+		fwd_text = 'Backward';
 	    }
 	    $('#_fwd_here').text(fwd_text);
 	}
