@@ -635,7 +635,8 @@ class Site {
 
     create_time_slider() {
 	var time_options = {timeDimension: this.timedim, loopButton: true,
-			    timeSliderDragUpdate: true};
+			    timeSliderDragUpdate: true,
+			    playReverseButton: true};
 	this.time_slider = L.control.timeDimension(time_options);
     }
 
@@ -994,9 +995,6 @@ class Hysplit {
 	    return this._div;
 	};
 	slider.addTo(this.map);
-	var slider_options = {max: 2, tickInterval: 1,
-			      tickLabels: {0: 'Deposition', 1: '0-150m', 2: '150-300m'},
-			      orientation: 'vertical' };
 	// Disable dragging when user's cursor enters the element
 	// courtesy of https://gis.stackexchange.com/a/104609
 	var map = this.map;
@@ -1007,7 +1005,9 @@ class Hysplit {
 	slider.getContainer().addEventListener('mouseout', function () {
             map.dragging.enable();
 	});
-	$('#height_slider2').labeledslider(slider_options);
+	var slider_options = {max: 2, orientation: "vertical"};
+	var pip_options = {rest: 'label', labels: ['Deposition', '0-150m', '150-300m']};
+	$('#height_slider2').slider(slider_options).slider("pips", pip_options);
     }
 
     initialize(divid) {
