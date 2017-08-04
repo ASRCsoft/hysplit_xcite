@@ -642,19 +642,22 @@ class Site {
     create_height_slider() {
 	var heights = this.heights;
 	var this2 = this;
+	// var getValue = function(h) {
+	//     if (h == 0) {
+	// 	return 'Deposition';
+	//     } else {
+	// 	return heights[h - 1] + '-' + heights[h] + 'm';
+	//     }
+	// }
 	var getValue = function(h) {
-	    if (h == 0) {
-		return 'Deposition';
-	    } else {
-		return heights[h - 1] + '-' + heights[h] + 'm';
-	    }
+	    return heights[h] + 'm';
 	}
 	var slider_options = {id: 'height_slider',
 			      title: 'Select Height', value: 0,
 			      max: heights.length - 1, position: 'bottomleft',
 			      logo: 'Height', size: '100px', collapsed: false,
 			      orientation: 'vertical',
-			      getValue: getValue, increment: true, syncSlider: true};
+			      getValue: getValue, syncSlider: true};
 	this.height_slider = L.control.slider(function(h) {this2.changeHeight(h);}, slider_options);
     };
 
@@ -1032,10 +1035,10 @@ class Hysplit {
 	var cur_name = this.cur_site.name;
 	var cur_fwd = this.cur_site.fwd;
 	if (cur_name != name || cur_fwd != fwd) {
-	    var this2 = this;
-	    var site;
 	    if (!this.cached_sites[name][fwd]) {
 		// get the site data
+		var this2 = this;
+		var site;
 		site = new Site(name, fwd, this);
 		this.cached_sites[name][fwd] = site;
 		site.loadData().done(function() {
