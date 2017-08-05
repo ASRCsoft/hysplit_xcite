@@ -567,10 +567,6 @@ class Site {
 	// load the site's metadata
 	var this2 = this;
 	// return this so it can be used as a promise
-	var json;
-	$.get(this.meta_path, function(json2) {
-	    json = json2;
-	})
 	return $.get(this.meta_path, function(json) {
 	    this2.data = json;
 	    this2.times = json['times'].map(function(text) {return new Date(text)});
@@ -934,6 +930,14 @@ class Hysplit {
 	site_selector.addTo(this.site_map);
     }
 
+    get fwd_str() {
+	if (this.cur_fwd) {
+	    return 'Forward';
+	} else {
+	    return 'Backward';
+	}
+    }
+
     addSimInfo() {
 	/* simulation info box */
 	var sim_info = L.control({position: 'topright'});
@@ -942,20 +946,30 @@ class Hysplit {
 	    this.update();
 	    return this._div;
 	};
+	var this2 = this;
 	sim_info.update = function (props) {
+	    var info_text;
 	    var custom_form;
-	    this._div.innerHTML = '<h4>Simulation Info:</h4>' +
-		'<p>Release site: BUFF<br>' +
-		'Trajectory: <span id="_fwd_here">Forward</span><br>' +
-		'Release time: 10am<br>' +
-		'More info about things, etc.</p>';
+	    info_text = '<h4>Simulation Info:</h4>' +
+		'<p>Release site: ' + this2.cur_name + '<br>' +
+		'Trajectory: ' + this2.fwd_str + '<br>' +
+		'Latitude: ' + this2.cur_site.data['latitude'] + '&#176; N<br>' +
+		'Longitude: ' + this2.cur_site.data['longitude'] + '&#176; W<br>' +
+		'Release height: ' + this2.cur_site.data['release_height'] + 'm AGL<br>';
+	    if (this2.cur_fwd) {
+		info_text += 'Release time: ' + this2.cur_site.data["release_time"] + ' UTC<br>' +
+		    'Release duration: ' + this2.cur_site.data["release_duration"] + ' hour(s)<br>';
+	    } else {
+		info_text += 'Arrival time: ' + this2.cur_site.data["release_time"] + ' UTC<br>'
+	    }
+	    this._div.innerHTML = info_text;
 	    custom_form = '<form id="hysplit" onSubmit="run_hysplit(); return false;">' +
 		'Latitude: <input type="text" name="lat"><br>' +
 		'Longitude: <input type="text" name="lon"><br>' +
 		'<input type="submit" value="Click me to run the model"></form>';
 	    this._div.innerHTML += '<h4>Custom Simulation:</h4>' + custom_form;
 	};
-	sim_info.addTo(this.map);
+	this.sim_info = sim_info.addTo(this.map);
     }
 
     addLayerControl() {
@@ -1024,46 +1038,54 @@ class Hysplit {
 	    this2.addLegend();
 	    this2.addSiteSelector();
 	    this2.origin_layer.addTo(this2.map);
-	    this2.addSimInfo();
 	    this2.addLayerControl();
 	    this2.cur_site.loadData().done(function() {
 		this2.cur_site.addTo(this2.map);
+		this2.addSimInfo();
 		// this2.addSlider2();
 	    });
 	});
+    }
+
+    update_info() {
+	this.sim_info.update();
+	// // update the simulation info
+	// var fwd_text;
+	// // flip the forward text
+	// if (this.cur_fwd) {
+	//     fwd_text = 'Forward';
+	// } else {
+	//     fwd_text = 'Backward';
+	// }
+	// $('#_fwd_here').text(this.fwd_str);
+	// $('#_site_here').text(this.cur_name);
+	// $('#_lat_here').text(this.cur_site.data['latitude']);
+	// $('#_lon_here').text(this.cur_site.data['longitude']);
+	// $('#_release_time_here').text(this.cur_site.data['release_time']);
+	// // $('#_site_here').text(this.cur_name);
     }
 
     changeSite(name, fwd) {
 	if (this.cur_name != name || this.cur_fwd != fwd) {
 	    this.cur_name = name;
 	    this.cur_fwd = fwd;
+	    // get the site data
+	    var this2 = this;
+	    var f = function() {
+		this2.cur_site.remove();
+		this2.cur_site = this2.cached_sites[name][fwd];
+		this2.cur_site.addTo(this2.map);
+		// update the simulation info
+		this2.update_info();
+	    };
 	    if (!this.cached_sites[name][fwd]) {
-		// get the site data
-		var this2 = this;
 		var site;
 		site = new Site(name, fwd, this);
 		this.cached_sites[name][fwd] = site;
-		var f = function() {
-		    this2.cur_site.remove();
-		    this2.cur_site = this2.cached_sites[name][fwd];
-		    this2.cur_site.addTo(this2.map);
-		};
 		site.loadData().then(f).fail(f);
 	    } else {
-		// use the cached version
-		this.cur_site.remove();
-		this.cur_site = this.cached_sites[name][fwd];
-		this.cur_site.addTo(this.map);
+		f();
 	    }
-	    // update the simulation info
-	    var fwd_text;
-	    // flip the forward text
-	    if (this.cur_fwd) {
-		fwd_text = 'Forward';
-	    } else {
-		fwd_text = 'Backward';
-	    }
-	    $('#_fwd_here').text(fwd_text);
 	}
     }
 
