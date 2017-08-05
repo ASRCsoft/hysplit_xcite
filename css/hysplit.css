@@ -60,3 +60,11 @@ sup, sub {
 sub { 
     top: 0.4em; 
 }
+
+/* slider stuff */
+.ui-slider-vertical.ui-slider-pips .ui-slider-label {
+    width: max-content;
+}
+.ui-slider-vertical {
+    height: 35px;    
+}

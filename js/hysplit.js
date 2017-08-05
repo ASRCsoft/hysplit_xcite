@@ -667,10 +667,10 @@ class Site {
 	    this.create_time_slider();
 	}
 	if (!this.height_slider) {
-	    this.create_height_slider();
+	    // this.create_height_slider();
 	}
 	this.time_slider.addTo(map);
-	this.height_slider.addTo(map);
+	// this.height_slider.addTo(map);
     };
 
     remove_sliders() {
@@ -979,18 +979,8 @@ class Hysplit {
 	    this._div = L.DomUtil.create('div', 'info');
 	    var grades = levels,
 		labels = [];
-	    var range_title = '<h4>Height</h4>'
+	    var range_title = '<h4>Height (m)</h4>'
 	    var range = '<div id="height_slider2"></div>'
-	    // var range = '<input orient="vertical" title="Select Height" id="height_slider" type="range" list="height_labels" style="width: 64px;">'
-	    // var datalist = '<datalist id="height_labels">'
-	    // var heights = {0: 'Deposition',
-	    // 		   1: '0-150m',
-	    // 		   2: '150-300m'}
-	    // $.each(heights, function(i, x) {
-	    // 	datalist += '<option value="' + i + '" label="' + x + '"></option>';
-	    // });
-	    // datalist += '</datalist>';
-	    // div.innerHTML = range_title + range + datalist;
 	    this._div.innerHTML = range_title + range;
 	    return this._div;
 	};
@@ -1005,8 +995,8 @@ class Hysplit {
 	slider.getContainer().addEventListener('mouseout', function () {
             map.dragging.enable();
 	});
-	var slider_options = {max: 2, orientation: "vertical"};
-	var pip_options = {rest: 'label', labels: ['Deposition', '0-150m', '150-300m']};
+	var slider_options = {max: 1, orientation: "vertical"};
+	var pip_options = {rest: 'label', labels: ['0-150', '150-300']};
 	$('#height_slider2').slider(slider_options).slider("pips", pip_options);
     }
 
@@ -1028,7 +1018,7 @@ class Hysplit {
 	    this2.addLayerControl();
 	    this2.cur_site.loadData().done(function() {
 		this2.cur_site.addTo(this2.map);
-		// this2.addSlider2();
+		this2.addSlider2();
 	    });
 	});
     }
