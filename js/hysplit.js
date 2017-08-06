@@ -976,10 +976,10 @@ class Hysplit {
 	var slider = L.control({position: 'bottomleft'});
 	this.slider2 = slider;
 	slider.onAdd = function (map) {
-	    this._div = L.DomUtil.create('div', 'info');
+	    this._div = L.DomUtil.create('div', 'info vertical-axis');
 	    var grades = levels,
 		labels = [];
-	    var range_title = '<h4>Height (m)</h4>'
+	    var range_title = '<h4>Height</h4>'
 	    var range = '<div id="height_slider2"></div>'
 	    this._div.innerHTML = range_title + range;
 	    return this._div;
@@ -996,7 +996,7 @@ class Hysplit {
             map.dragging.enable();
 	});
 	var slider_options = {max: 1, orientation: "vertical"};
-	var pip_options = {rest: 'label', labels: ['0-150', '150-300']};
+	var pip_options = {rest: 'label', labels: ['0-150m', '150-300m']};
 	$('#height_slider2').slider(slider_options).slider("pips", pip_options);
     }
 
