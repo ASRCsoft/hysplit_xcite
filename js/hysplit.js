@@ -462,6 +462,26 @@ L.timeDimension.layer.geoJson2 = function(layer, options) {
     return new L.TimeDimension.Layer.GeoJson2(layer, options);
 };
 
+L.TimeDimension.Player = L.TimeDimension.Player.extend({
+    setTransitionTime: function(transitionTime) {
+        this._transitionTime = transitionTime;
+        if (typeof this._buffer === 'function') {
+            this._bufferSize = this._buffer.call(this, this._transitionTime, this._minBufferReady, this._loop);
+            console.log('Buffer size changed to ' + this._bufferSize);
+        } else {
+            this._bufferSize = this._buffer;
+        }
+        if (this._intervalID) {
+            this.stop();
+            this.start(this._steps);
+        }
+        this.fire('speedchange', {
+            transitionTime: transitionTime,
+            buffer: this._bufferSize
+        });
+    }
+});
+
 
 // and while I'm here...
 
