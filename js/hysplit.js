@@ -217,6 +217,9 @@ L.LayerSwitcher = L.LayerGroup.extend({
 	var ind = [];
 	for (i = 0; i < this.ndim; i++) {
 	    ind[i] = this.values[i].indexOf(val[i]);
+	    if (ind[i] == -1) {
+		throw 'Value ' + val[i] + 'not found in array dimension ' + i;
+	    }
 	}
 	return ind;
     },
@@ -563,18 +566,34 @@ class Site {
 	};
     }
 
+    resetTimedim() {
+	if (!this._hysplit.timedim) {
+	    var start_time;
+	    if (this.fwd) {
+		start_time = this.times[0];
+	    } else {
+		start_time = this.times[this.times.length - 1];
+	    }
+	    var timedim_options = {times: this.times,
+				   currentTime: start_time};
+	    this._hysplit.timedim = L.timeDimension(timedim_options);
+	} else {
+	    this._hysplit.timedim.setAvailableTimes(this.times, 'replace');
+	}
+    }
+
     loadData() {
-	// load the site's metadata
+	// load the site's metadata, if needed
+	if (!!this.data) {
+	    // if the data is already loaded
+	    return $.when();
+	}
 	var this2 = this;
 	// return this so it can be used as a promise
 	return $.get(this.meta_path, function(json) {
 	    this2.data = json;
 	    this2.times = json['times'].map(function(text) {return new Date(text)});
 	    this2.heights = json['heights'];
-	    // this2.makeContours();
-	    var timedim_options = {times: this2.times,
-				   currentTime: this2.times[0]};
-	    this2.timedim = L.timeDimension(timedim_options);
 	    try {
 		// get the trajectory if it exists
 		var trajectories;
@@ -584,12 +603,15 @@ class Site {
 		    onEachFeature: onEachTrajectory,
 		    smoothFactor: 1
 		});
-		var traj_options = {timeDimension: this2.timedim,
+		var traj_options = {timeDimension: this2._hysplit.timedim,
 				    fwd: this2.fwd};
 		this2.trajectories = L.timeDimension.layer.geoJson2(trajectory_layer, traj_options);
 	    } catch(err) {}
 	    var folder = this2.folder;
 	    var makeLayer = function(ind) {
+		if (ind.some(function(x) {return x < 0})) {
+		    throw "Negative index in makeLayer";
+		}
 		var file = 'height' + ind[1] + '_time' + ind[0] + '.json';
 		var contour_path = folder + file;    
 		return L.topoJson(null, {
@@ -602,7 +624,7 @@ class Site {
 	    var ls_options = {values: [this2.times, this2.heights],
 			      makeLayer: makeLayer};
 	    this2.contours = L.layerSwitcher(ls_options);
-	    var td_options = {timeDimension: this2.timedim};
+	    var td_options = {timeDimension: this2._hysplit.timedim};
 	    this2.td_layer = L.timeDimension.layer.layerSwitcher(this2.contours, td_options);
 	});
     }
@@ -619,7 +641,7 @@ class Site {
 
     changeHeight(height) {
 	var units;
-	var time = this.times.indexOf(this.timedim.getCurrentTime());
+	var time = this.times.indexOf(this._hysplit.timedim.getCurrentTime());
 	this.displayData(time, height);
 	if (height > 0) {
 	    units = 'ng/m<sup>3</sup>';
@@ -628,13 +650,6 @@ class Site {
 	}
 	$.each($('._units_here'), function(i, x) {x.innerHTML = units});
     };
-
-    create_time_slider() {
-	var time_options = {timeDimension: this.timedim, loopButton: true,
-			    timeSliderDragUpdate: true,
-			    playReverseButton: true};
-	this.time_slider = L.control.timeDimension(time_options);
-    }
 
     create_height_slider() {
 	var heights = this.heights;
@@ -660,12 +675,12 @@ class Site {
 
     setup_sliders(map) {
 	if (!this.time_slider) {
-	    this.create_time_slider();
+	    // this.create_time_slider();
 	}
 	if (!this.height_slider) {
 	    this.create_height_slider();
 	}
-	this.time_slider.addTo(map);
+	// this.time_slider.addTo(map);
 	this.height_slider.addTo(map);
     };
 
@@ -681,18 +696,22 @@ class Site {
     clearLayers() {
 	this.contour_layer.clearLayers();
 	this.trajectory_layer.clearLayers();
-	this.timedim.remove();
+	this.td_layer.remove();
     }
 
     addTo(map) {
-	this.setup_sliders(map);
-	this.contour_layer.addLayer(this.contours);
-	this.trajectory_layer.addLayer(this.trajectories);
-	this.td_layer.addTo(map);
+	this.loadData().done(function() {
+	    this.resetTimedim();
+	    this.setup_sliders(map);
+	    this.contour_layer.addLayer(this.contours);
+	    this.trajectory_layer.addLayer(this.trajectories);
+	    this.td_layer.addTo(map);
+	}.bind(this));
     }
 
     remove() {
 	this.remove_sliders();
+	
 	try {
 	    this.clearLayers();   
 	} catch(err) {}
@@ -838,6 +857,8 @@ class Hysplit {
 	this.cached_sites = {};
 	this.site_map;
 	this.origin_circle;
+	this.timedim = L.timeDimension({times: []});
+	this.time_slider;
 	// make two fakelayers (fwd and bck) to include in the layer controller
 	this.fwd_layer = L.fakeLayer({hysplit: this, fwd: true});
 	this.bck_layer = L.fakeLayer({hysplit: this, fwd: false});
@@ -950,17 +971,20 @@ class Hysplit {
 	sim_info.update = function (props) {
 	    var info_text;
 	    var custom_form;
-	    info_text = '<h4>Simulation Info:</h4>' +
-		'<p>Release site: ' + this2.cur_name + '<br>' +
-		'Trajectory: ' + this2.fwd_str + '<br>' +
-		'Latitude: ' + this2.cur_site.data['latitude'] + '&#176; N<br>' +
-		'Longitude: ' + this2.cur_site.data['longitude'] + '&#176; W<br>' +
-		'Release height: ' + this2.cur_site.data['release_height'] + 'm AGL<br>';
-	    if (this2.cur_fwd) {
-		info_text += 'Release time: ' + this2.cur_site.data["release_time"] + ' UTC<br>' +
-		    'Release duration: ' + this2.cur_site.data["release_duration"] + ' hour(s)<br>';
-	    } else {
-		info_text += 'Arrival time: ' + this2.cur_site.data["release_time"] + ' UTC<br>'
+	    info_text = '<h4>Simulation Info:</h4>';
+	    if (this.cur_site) {
+		info_text += '<h4>Simulation Info:</h4>' +
+		    '<p>Release site: ' + this2.cur_name + '<br>' +
+		    'Trajectory: ' + this2.fwd_str + '<br>' +
+		    'Latitude: ' + this2.cur_site.data['latitude'] + '&#176; N<br>' +
+		    'Longitude: ' + this2.cur_site.data['longitude'] + '&#176; W<br>' +
+		    'Release height: ' + this2.cur_site.data['release_height'] + 'm AGL<br>';
+		if (this2.cur_fwd) {
+		    info_text += 'Release time: ' + this2.cur_site.data["release_time"] + ' UTC<br>' +
+			'Release duration: ' + this2.cur_site.data["release_duration"] + ' hour(s)<br>';
+		} else {
+		    info_text += 'Arrival time: ' + this2.cur_site.data["release_time"] + ' UTC<br>'
+		}	
 	    }
 	    this._div.innerHTML = info_text;
 	    custom_form = '<form id="hysplit" onSubmit="run_hysplit(); return false;">' +
@@ -1024,45 +1048,37 @@ class Hysplit {
 	$('#height_slider2').slider(slider_options).slider("pips", pip_options);
     }
 
+    addTimeSlider() {
+	var time_options = {timeDimension: this.timedim, loopButton: true,
+			    timeSliderDragUpdate: true,
+			    playReverseButton: true};
+	this.time_slider = L.control.timeDimension(time_options);
+	this.time_slider.addTo(this.map);
+    }
+
     initialize(divid) {
-	var this2 = this;
-	var site_name;
-	var site_fwd;
 	return this.get_sites().done(function() {
-	    site_name = this2.cur_site.name;
-	    site_fwd = this2.cur_site.fwd;
-	    this2.cached_sites[site_name][site_fwd] = this2.cur_site;
-	    this2.map = L.map(divid, {layers: [this2.fwd_layer, this2.contour_layer, this2.trajectory_layer]}).
+	    var site_name = this.cur_site.name;
+	    var site_fwd = this.cur_site.fwd;
+	    this.cached_sites[site_name][site_fwd] = this.cur_site;
+	    this.map = L.map(divid, {layers: [this.fwd_layer, this.contour_layer, this.trajectory_layer]}).
 		setView([43, -74.5], 7);
-	    this2.addTileLayer();
-	    this2.addLegend();
-	    this2.addSiteSelector();
-	    this2.origin_layer.addTo(this2.map);
-	    this2.addLayerControl();
-	    this2.cur_site.loadData().done(function() {
-		this2.cur_site.addTo(this2.map);
-		this2.addSimInfo();
-		// this2.addSlider2();
-	    });
-	});
+	    this.addTileLayer();
+	    this.addLegend();
+	    this.addSiteSelector();
+	    this.origin_layer.addTo(this.map);
+	    this.addLayerControl();
+	    this.addTimeSlider();
+	    this.cur_site.loadData().done(function() {
+		this.cur_site.addTo(this.map);
+		this.addSimInfo();
+	    	// this.addSlider2();
+	    }.bind(this));
+	}.bind(this));
     }
 
     update_info() {
 	this.sim_info.update();
-	// // update the simulation info
-	// var fwd_text;
-	// // flip the forward text
-	// if (this.cur_fwd) {
-	//     fwd_text = 'Forward';
-	// } else {
-	//     fwd_text = 'Backward';
-	// }
-	// $('#_fwd_here').text(this.fwd_str);
-	// $('#_site_here').text(this.cur_name);
-	// $('#_lat_here').text(this.cur_site.data['latitude']);
-	// $('#_lon_here').text(this.cur_site.data['longitude']);
-	// $('#_release_time_here').text(this.cur_site.data['release_time']);
-	// // $('#_site_here').text(this.cur_name);
     }
 
     changeSite(name, fwd) {
@@ -1070,19 +1086,24 @@ class Hysplit {
 	    this.cur_name = name;
 	    this.cur_fwd = fwd;
 	    // get the site data
-	    var this2 = this;
 	    var f = function() {
-		this2.cur_site.remove();
-		this2.cur_site = this2.cached_sites[name][fwd];
-		this2.cur_site.addTo(this2.map);
+		this.cur_site.remove();
+		this.cur_site = this.cached_sites[name][fwd];
+		this.cur_site.addTo(this.map);
 		// update the simulation info
-		this2.update_info();
-	    };
+		this.update_info();
+	    }.bind(this);
+	    var f_fail = function() {
+		this.cur_site.remove();
+		this.cur_site = this.cached_sites[name][fwd];
+		// not adding anything to the map
+		this.update_info();
+	    }.bind(this);
 	    if (!this.cached_sites[name][fwd]) {
 		var site;
 		site = new Site(name, fwd, this);
 		this.cached_sites[name][fwd] = site;
-		site.loadData().then(f).fail(f);
+		site.loadData().done(f).fail(f_fail);
 	    } else {
 		f();
 	    }
