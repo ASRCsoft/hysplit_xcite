@@ -92,3 +92,7 @@ html .ui-button.ui-state-disabled:hover,
 html .ui-button.ui-state-disabled:active {
     border: 1px solid #666;
 }
+/* get rid of the garish blue jquery ui default color when active */
+.ui-state-active, .ui-widget-content .ui-state-active {
+    background: #e5e5e5;
+}

@@ -217,6 +217,9 @@ L.LayerSwitcher = L.LayerGroup.extend({
 	var ind = [];
 	for (i = 0; i < this.ndim; i++) {
 	    ind[i] = this.values[i].indexOf(val[i]);
+	    if (ind[i] == -1) {
+		throw 'Value ' + val[i] + 'not found in array dimension ' + i;
+	    }
 	}
 	return ind;
     },
@@ -563,22 +566,34 @@ class Site {
 	};
     }
 
+    resetTimedim() {
+	if (!this._hysplit.timedim) {
+	    var start_time;
+	    if (this.fwd) {
+		start_time = this.times[0];
+	    } else {
+		start_time = this.times[this.times.length - 1];
+	    }
+	    var timedim_options = {times: this.times,
+				   currentTime: start_time};
+	    this._hysplit.timedim = L.timeDimension(timedim_options);
+	} else {
+	    this._hysplit.timedim.setAvailableTimes(this.times, 'replace');
+	}
+    }
+
     loadData() {
-	// load the site's metadata
+	// load the site's metadata, if needed
+	if (!!this.data) {
+	    // if the data is already loaded
+	    return $.when();
+	}
 	var this2 = this;
 	// return this so it can be used as a promise
-	var json;
-	$.get(this.meta_path, function(json2) {
-	    json = json2;
-	})
 	return $.get(this.meta_path, function(json) {
 	    this2.data = json;
 	    this2.times = json['times'].map(function(text) {return new Date(text)});
 	    this2.heights = json['heights'];
-	    // this2.makeContours();
-	    var timedim_options = {times: this2.times,
-				   currentTime: this2.times[0]};
-	    this2.timedim = L.timeDimension(timedim_options);
 	    try {
 		// get the trajectory if it exists
 		var trajectories;
@@ -588,12 +603,15 @@ class Site {
 		    onEachFeature: onEachTrajectory,
 		    smoothFactor: 1
 		});
-		var traj_options = {timeDimension: this2.timedim,
+		var traj_options = {timeDimension: this2._hysplit.timedim,
 				    fwd: this2.fwd};
 		this2.trajectories = L.timeDimension.layer.geoJson2(trajectory_layer, traj_options);
 	    } catch(err) {}
 	    var folder = this2.folder;
 	    var makeLayer = function(ind) {
+		if (ind.some(function(x) {return x < 0})) {
+		    throw "Negative index in makeLayer";
+		}
 		var file = 'height' + ind[1] + '_time' + ind[0] + '.json';
 		var contour_path = folder + file;    
 		return L.topoJson(null, {
@@ -606,7 +624,7 @@ class Site {
 	    var ls_options = {values: [this2.times, this2.heights],
 			      makeLayer: makeLayer};
 	    this2.contours = L.layerSwitcher(ls_options);
-	    var td_options = {timeDimension: this2.timedim};
+	    var td_options = {timeDimension: this2._hysplit.timedim};
 	    this2.td_layer = L.timeDimension.layer.layerSwitcher(this2.contours, td_options);
 	});
     }
@@ -621,10 +639,12 @@ class Site {
 	this.displayData(time, this.height);
     }
 
-    changeHeight(height) {
+    changeHeight(e, ui) {
 	var units;
-	var time = this.times.indexOf(this.timedim.getCurrentTime());
-	this.displayData(time, height);
+	var time = this.times.indexOf(this._hysplit.timedim.getCurrentTime());
+	var height_index = ui.value;
+	this.displayData(time, height_index);
+	var height = this.heights[height_index]; // the actual height value, in meters
 	if (height > 0) {
 	    units = 'ng/m<sup>3</sup>';
 	} else {
@@ -633,50 +653,69 @@ class Site {
 	$.each($('._units_here'), function(i, x) {x.innerHTML = units});
     };
 
-    create_time_slider() {
-	var time_options = {timeDimension: this.timedim, loopButton: true,
-			    timeSliderDragUpdate: true,
-			    playReverseButton: true};
-	this.time_slider = L.control.timeDimension(time_options);
+    makeHeightLabel(h) {
+	var heights = this.heights;
+    	if (heights[h] == 0) {
+    	    return 'Deposition';
+	} else if (h == 0) {
+	    return '0-' + heights[h] + 'm';
+    	} else {
+    	    return heights[h - 1] + '-' + heights[h] + 'm';
+    	}
     }
 
-    create_height_slider() {
-	var heights = this.heights;
-	var this2 = this;
-	// var getValue = function(h) {
-	//     if (h == 0) {
-	// 	return 'Deposition';
-	//     } else {
-	// 	return heights[h - 1] + '-' + heights[h] + 'm';
-	//     }
-	// }
-	var getValue = function(h) {
-	    return heights[h] + 'm';
+    createHeightSlider() {
+	this.height_slider = L.control({position: 'bottomleft'});
+	var slider = this.height_slider;
+	slider.onAdd = function (map) {
+	    if (!this._div) {
+		// set up the div if it isn't there already
+		this._div = L.DomUtil.create('div', 'info vertical-axis');
+		var grades = levels,
+		    labels = [];
+		var range_title = '<h4>Height</h4>'
+		var range = '<div id="height_slider2"></div>'
+		this._div.innerHTML = range_title + range;
+	    }
+	    return this._div;
+	};
+	var map = this._hysplit.map;
+	slider.addTo(map);
+	// Disable dragging when user's cursor enters the element
+	// courtesy of https://gis.stackexchange.com/a/104609
+	slider.getContainer().addEventListener('mouseover', function () {
+            map.dragging.disable();
+	});
+	// Re-enable dragging when user's cursor leaves the element
+	slider.getContainer().addEventListener('mouseout', function () {
+            map.dragging.enable();
+	});
+	// set up the jquery slider
+	var nheights = this.heights.length;
+	var slider_options = {max: nheights - 1, orientation: "vertical",
+			      slide: this.changeHeight.bind(this),
+			      change: this.changeHeight.bind(this)};
+	// get the slider labels
+	var labels = [];
+	for (i = 0; i < nheights; i++) {
+	    labels.push(this.makeHeightLabel(i))
 	}
-	var slider_options = {id: 'height_slider',
-			      title: 'Select Height', value: 0,
-			      max: heights.length - 1, position: 'bottomleft',
-			      logo: 'Height', size: '100px', collapsed: false,
-			      orientation: 'vertical',
-			      getValue: getValue, syncSlider: true};
-	this.height_slider = L.control.slider(function(h) {this2.changeHeight(h);}, slider_options);
-    };
+	var pip_options = {rest: 'label', labels: labels};
+	$('#height_slider2').slider(slider_options).slider("pips", pip_options);
+	// set the slider height
+	var slider_height = (25 * (nheights - 1)) + 'px';
+	$('#height_slider2')[0].style.height = slider_height;
+    }
 
     setup_sliders(map) {
-	if (!this.time_slider) {
-	    this.create_time_slider();
-	}
 	if (!this.height_slider) {
-	    // this.create_height_slider();
+	    this.createHeightSlider();
+	} else {
+	    this.height_slider.addTo(map);   
 	}
-	this.time_slider.addTo(map);
-	// this.height_slider.addTo(map);
     };
 
     remove_sliders() {
-	try {
-	    this.time_slider.remove();
-	} catch(err) {}
 	try {
 	    this.height_slider.remove();	    
 	} catch(err) {}
@@ -685,14 +724,17 @@ class Site {
     clearLayers() {
 	this.contour_layer.clearLayers();
 	this.trajectory_layer.clearLayers();
-	this.timedim.remove();
+	this.td_layer.remove();
     }
 
     addTo(map) {
-	this.setup_sliders(map);
-	this.contour_layer.addLayer(this.contours);
-	this.trajectory_layer.addLayer(this.trajectories);
-	this.td_layer.addTo(map);
+	this.loadData().done(function() {
+	    this.resetTimedim();
+	    this.setup_sliders(map);
+	    this.contour_layer.addLayer(this.contours);
+	    this.trajectory_layer.addLayer(this.trajectories);
+	    this.td_layer.addTo(map);
+	}.bind(this));
     }
 
     remove() {
@@ -842,6 +884,8 @@ class Hysplit {
 	this.cached_sites = {};
 	this.site_map;
 	this.origin_circle;
+	this.timedim = L.timeDimension({times: []});
+	this.time_slider;
 	// make two fakelayers (fwd and bck) to include in the layer controller
 	this.fwd_layer = L.fakeLayer({hysplit: this, fwd: true});
 	this.bck_layer = L.fakeLayer({hysplit: this, fwd: false});
@@ -892,14 +936,20 @@ class Hysplit {
 		grades = levels,
 		labels = [],
 		from, to;
-	    var legend_title = '<h4>PM Levels</h4>'
+	    var legend_title = '<h4>PM Levels</h4>';
+	    var units;
+	    if (this2.cur_site.heights[this2.cur_site.height] == 0) {
+		units = 'ng/m<sup>2</sup>';
+	    } else {
+		units = 'ng/m<sup>3</sup>';
+	    }
 	    for (var i = grades.length - 1; i >= 0; i--) {
 		from = grades[i];
 		to = grades[i + 1];
 		labels.push('<i style="background:' + this2.getColor(from) + '"></i> <b>' +
 			    '10<sup>' + from + '</sup>' +
 			    (i + 1 < grades.length ? '&ndash;10<sup>' + to + '</sup>' : '+') +
-			    '</b> <span class="_units_here">ng/m<sup>2</sup></span>');
+			    '</b> <span class="_units_here">' + units + '</span>');
 	    }
 	    div.innerHTML = legend_title + labels.join('<br>');
 	    return div;
@@ -934,6 +984,14 @@ class Hysplit {
 	site_selector.addTo(this.site_map);
     }
 
+    get fwd_str() {
+	if (this.cur_fwd) {
+	    return 'Forward';
+	} else {
+	    return 'Backward';
+	}
+    }
+
     addSimInfo() {
 	/* simulation info box */
 	var sim_info = L.control({position: 'topright'});
@@ -942,20 +1000,32 @@ class Hysplit {
 	    this.update();
 	    return this._div;
 	};
+	var this2 = this;
 	sim_info.update = function (props) {
+	    var info_text;
 	    var custom_form;
-	    this._div.innerHTML = '<h4>Simulation Info:</h4>' +
-		'<p>Release site: BUFF<br>' +
-		'Trajectory: <span id="_fwd_here">Forward</span><br>' +
-		'Release time: 10am<br>' +
-		'More info about things, etc.</p>';
+	    info_text = '<h4>Simulation Info:</h4>';
+	    if (this2.cur_site) {
+		info_text += '<p>Release site: ' + this2.cur_name + '<br>' +
+		    'Trajectory: ' + this2.fwd_str + '<br>' +
+		    'Latitude: ' + this2.cur_site.data['latitude'] + '&#176; N<br>' +
+		    'Longitude: ' + this2.cur_site.data['longitude'] + '&#176; W<br>' +
+		    'Release height: ' + this2.cur_site.data['release_height'] + 'm AGL<br>';
+		if (this2.cur_fwd) {
+		    info_text += 'Release time: ' + this2.cur_site.data["release_time"] + ' UTC<br>' +
+			'Release duration: ' + this2.cur_site.data["release_duration"] + ' hour(s)<br>';
+		} else {
+		    info_text += 'Arrival time: ' + this2.cur_site.data["release_time"] + ' UTC<br>'
+		}	
+	    }
+	    this._div.innerHTML = info_text;
 	    custom_form = '<form id="hysplit" onSubmit="run_hysplit(); return false;">' +
 		'Latitude: <input type="text" name="lat"><br>' +
 		'Longitude: <input type="text" name="lon"><br>' +
 		'<input type="submit" value="Click me to run the model"></form>';
 	    this._div.innerHTML += '<h4>Custom Simulation:</h4>' + custom_form;
 	};
-	sim_info.addTo(this.map);
+	this.sim_info = sim_info.addTo(this.map);
     }
 
     addLayerControl() {
@@ -971,89 +1041,64 @@ class Hysplit {
 	L.control.layers(baseMaps, overlayMaps, {position: 'topleft'}).addTo(this.map);
     }
 
-    addSlider2() {
-	var this2 = this;
-	var slider = L.control({position: 'bottomleft'});
-	this.slider2 = slider;
-	slider.onAdd = function (map) {
-	    this._div = L.DomUtil.create('div', 'info vertical-axis');
-	    var grades = levels,
-		labels = [];
-	    var range_title = '<h4>Height</h4>'
-	    var range = '<div id="height_slider2"></div>'
-	    this._div.innerHTML = range_title + range;
-	    return this._div;
-	};
-	slider.addTo(this.map);
-	// Disable dragging when user's cursor enters the element
-	// courtesy of https://gis.stackexchange.com/a/104609
-	var map = this.map;
-	slider.getContainer().addEventListener('mouseover', function () {
-            map.dragging.disable();
-	});
-	// Re-enable dragging when user's cursor leaves the element
-	slider.getContainer().addEventListener('mouseout', function () {
-            map.dragging.enable();
-	});
-	var slider_options = {max: 1, orientation: "vertical"};
-	var pip_options = {rest: 'label', labels: ['0-150m', '150-300m']};
-	$('#height_slider2').slider(slider_options).slider("pips", pip_options);
+    addTimeSlider() {
+	var time_options = {timeDimension: this.timedim, loopButton: true,
+			    timeSliderDragUpdate: true,
+			    playReverseButton: true};
+	this.time_slider = L.control.timeDimension(time_options);
+	this.time_slider.addTo(this.map);
     }
 
     initialize(divid) {
-	var this2 = this;
-	var site_name;
-	var site_fwd;
 	return this.get_sites().done(function() {
-	    site_name = this2.cur_site.name;
-	    site_fwd = this2.cur_site.fwd;
-	    this2.cached_sites[site_name][site_fwd] = this2.cur_site;
-	    this2.map = L.map(divid, {layers: [this2.fwd_layer, this2.contour_layer, this2.trajectory_layer]}).
+	    var site_name = this.cur_site.name;
+	    var site_fwd = this.cur_site.fwd;
+	    this.cached_sites[site_name][site_fwd] = this.cur_site;
+	    this.map = L.map(divid, {layers: [this.fwd_layer, this.contour_layer, this.trajectory_layer]}).
 		setView([43, -74.5], 7);
-	    this2.addTileLayer();
-	    this2.addLegend();
-	    this2.addSiteSelector();
-	    this2.origin_layer.addTo(this2.map);
-	    this2.addSimInfo();
-	    this2.addLayerControl();
-	    this2.cur_site.loadData().done(function() {
-		this2.cur_site.addTo(this2.map);
-		this2.addSlider2();
-	    });
-	});
+	    this.addTileLayer();
+	    this.addSiteSelector();
+	    this.origin_layer.addTo(this.map);
+	    this.addLayerControl();
+	    this.addTimeSlider();
+	    this.cur_site.loadData().done(function() {
+		this.cur_site.addTo(this.map);
+		this.addLegend();
+		this.addSimInfo();
+	    }.bind(this));
+	}.bind(this));
+    }
+
+    update_info() {
+	this.sim_info.update();
     }
 
     changeSite(name, fwd) {
 	if (this.cur_name != name || this.cur_fwd != fwd) {
 	    this.cur_name = name;
 	    this.cur_fwd = fwd;
-	    if (!this.cached_sites[name][fwd]) {
-		// get the site data
-		var this2 = this;
-		var site;
-		site = new Site(name, fwd, this);
-		this.cached_sites[name][fwd] = site;
-		var f = function() {
-		    this2.cur_site.remove();
-		    this2.cur_site = this2.cached_sites[name][fwd];
-		    this2.cur_site.addTo(this2.map);
-		};
-		site.loadData().then(f).fail(f);
-	    } else {
-		// use the cached version
+	    // get the site data
+	    var f = function() {
 		this.cur_site.remove();
 		this.cur_site = this.cached_sites[name][fwd];
 		this.cur_site.addTo(this.map);
-	    }
-	    // update the simulation info
-	    var fwd_text;
-	    // flip the forward text
-	    if (this.cur_fwd) {
-		fwd_text = 'Forward';
+		// update the simulation info
+		this.update_info();
+	    }.bind(this);
+	    var f_fail = function() {
+		this.cur_site.remove();
+		this.cur_site = this.cached_sites[name][fwd];
+		// not adding anything to the map
+		this.update_info();
+	    }.bind(this);
+	    if (!this.cached_sites[name][fwd]) {
+		var site;
+		site = new Site(name, fwd, this);
+		this.cached_sites[name][fwd] = site;
+		site.loadData().done(f).fail(f_fail);
 	    } else {
-		fwd_text = 'Backward';
+		f();
 	    }
-	    $('#_fwd_here').text(fwd_text);
 	}
     }
 
