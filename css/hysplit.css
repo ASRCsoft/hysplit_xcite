@@ -96,3 +96,8 @@ html .ui-button.ui-state-disabled:active {
 .ui-state-active, .ui-widget-content .ui-state-active {
     background: #e5e5e5;
 }
+
+/* make the leaflet-timedimension player look a little nicer */
+.leaflet-bar-timecontrol .leaflet-control-timecontrol {
+    border: none;
+}
