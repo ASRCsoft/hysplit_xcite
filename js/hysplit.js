@@ -87,240 +87,7 @@ var run_hysplit = function() {
     });
 };
 
-
-// classes
-
-L.TopoJSON = L.GeoJSON.extend({
-    // A lazy-loading topojson layer for leaflet. Cool right?
-    addData: function (data) {
-	// correctly add topojson data
-	var geojson, key;
-	if (data.type === "Topology") {
-	    for (key in data.objects) {
-		if (data.objects.hasOwnProperty(key)) {
-		    geojson = topojson.feature(data, data.objects[key]);
-		    L.GeoJSON.prototype.addData.call(this, geojson);
-		}
-	    }
-	    return this;
-	}
-	L.GeoJSON.prototype.addData.call(this, data);
-	return this;
-    },
-    loadData: function(url) {
-	// load the data if needed
-	if (!this.dataIsLoaded) {
-	    this.dataIsLoaded = true;
-	    var topo = this;
-	    return $.getJSON(this.options.file_path, function(gjson) {
-		topo.initialize(gjson, topo.options);
-		// topo.dataIsLoaded = true;
-	    });
-	} else {
-	    return $.when();
-	}
-    },
-    addTo: function (map) {
-	// make sure data is loaded before adding to map
-	this.loadData(this.options.file_path);
-	L.GeoJSON.prototype.addTo.call(this, map);
-    },
-    beforeAdd: function(map) {
-	// make sure data is loaded before adding to map
-	this.loadData(this.options.file_path);
-    },
-    dataIsLoaded: false
-});
-
-L.topoJson = function (data, options) {
-    return new L.TopoJSON(data, options);
-};
-
-// the topojson part of this class came from the example by Brendan
-// Vinson: https://gist.github.com/brendanvinson/0e3c3c86d96863f1c33f55454705bca7
-/* 
-   The MIT License (MIT)
-   Copyright (c) 2016 Brendan Vinson
-   Permission is hereby granted, free of charge, to any person obtaining a copy
-   of this software and associated documentation files (the "Software"), to deal
-   in the Software without restriction, including without limitation the rights
-   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-   copies of the Software, and to permit persons to whom the Software is
-   furnished to do so, subject to the following conditions:
-   The above copyright notice and this permission notice shall be included in
-   all copies or substantial portions of the Software.
-   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-   THE SOFTWARE.
-*/
-
-
-// omg this is pure madness
-L.LayerSwitcher = L.LayerGroup.extend({
-    cache: [],
-    values: [],
-    initialize: function(options) {
-	L.LayerGroup.prototype.initialize.call(this, []);
-	this.values = options['values'];
-	this.lazy = options['lazy'] || true;
-	this.dims = this.values.map(function(x) {return x.length});
-	this.ndim = this.dims.length;
-	this.time = 0;
-	this.height = 0;
-	this.setupCache();
-	if (options['makeLayer']) {
-	    this.makeLayer = options['makeLayer'];
-	}
-    },
-    setupCache: function() {
-	var arr_len = 1;
-	for (i = 0; i < this.ndim; i++) {
-	    arr_len *= this.dims[i];
-	}
-	this.cache = new Array(arr_len);
-    },
-    indToArrayInd: function(ind) {
-	// get the 1D array index
-	var arr_ind = 0;
-	var dim_n = 1;
-	for (i = this.ndim - 2; i >= 0; i--) {
-	    // gotta jump this.dims[i + 1] times farther for every
-	    // index for this dimension
-	    dim_n *= this.dims[i + 1];
-	    arr_ind += dim_n * ind[i];
-	}
-	// add back that last dimension
-	arr_ind += ind[this.ndim - 1];
-	return arr_ind;
-    },
-    valToArrayInd: function(val) {
-	return this.indToArrayInd(this.getValueIndex(val));
-    },
-    loadLayer: function(ind) {
-	var arr_ind = this.indToArrayInd(ind);
-	if (!this.cache[arr_ind]) {
-	    this.cache[arr_ind] = this.makeLayer(ind);
-	    return this.cache[arr_ind].loadData();
-	} else {
-	    return $.when();
-	}
-    },
-    setIndex: function(ind) {
-	this.time = ind[0];
-	this.height = ind[1];
-    },
-    getValueIndex: function(val) {
-	var ind = [];
-	for (i = 0; i < this.ndim; i++) {
-	    ind[i] = this.values[i].indexOf(val[i]);
-	    if (ind[i] == -1) {
-		throw 'Value ' + val[i] + 'not found in array dimension ' + i;
-	    }
-	}
-	return ind;
-    },
-    addValue: function(val) {
-	this.loadLayer(this.getValueIndex(val));
-	this.addLayer(this.cache[this.valToArrayInd(val)]);
-    },
-    addIndex: function(ind) {
-	this.loadLayer(ind);
-	this.addLayer(this.cache[this.indToArrayInd(ind)]);
-    },
-    removeIndex: function(ind) {
-	this.removeLayer(this.cache[this.indToArrayInd(ind)]);
-    },
-    removeValue: function(val) {
-	this.removeLayer(this.cache[this.valToArrayInd(val)]);
-    },
-    switchToValue: function(val) {
-	this.clearLayers();
-	this.addValue(val);
-	this.setIndex(this.getValueIndex(val));
-    },
-    switchToIndex: function(ind) {
-	this.clearLayers();
-	this.addIndex(ind);
-	this.setIndex(ind);
-    },
-    // and some special functions just for us
-    switchTimeVal: function(t) {
-	var time_index = this.values[0].indexOf(t);
-	this.switchToIndex([time_index, this.height]);
-    },
-    switchHeight: function(h) {
-	this.switchToIndex([this.time, h]);
-    },
-    loadTime: function(t) {
-	var time_index = this.values[0].indexOf(t);
-	return this.loadLayer([time_index, this.height]);
-    },
-});
-
-L.layerSwitcher = function(layers, options) {
-    return new L.LayerSwitcher(layers, options);
-};
-
-
-// based on advice here: https://github.com/socib/Leaflet.TimeDimension/issues/19
-L.TimeDimension.Layer.LayerSwitcher = L.TimeDimension.Layer.extend({
-
-    initialize: function(layer, options) {
-        L.TimeDimension.Layer.prototype.initialize.call(this, layer, options);
-        this._currentLoadedTime = 0;
-        this._currentTimeData = null;
-    },
-
-    onAdd: function(map) {
-	// I think this should be edited somehow to start with the
-	// correct time
-        L.TimeDimension.Layer.prototype.onAdd.call(this, map);
-        // if (this._timeDimension) {
-        //     this._getDataForTime(this._timeDimension.getCurrentTime());
-        // }
-	this._update();
-    },
-
-    _onNewTimeLoading: function(ev) {
-	// ok. Instead of getting data directly, we're going to get
-	// the appropriate layer from site.contours, then call
-	// loadData on it
-        if (!this._map) {
-            return;
-        }
-	// should probably be grabbing data here and firing event on
-	// completion (but this is good enough for now)
-	var time = ev.time;
-	var this2 = this;
-	this._baseLayer.loadTime(time).done(function() {
-	    this2.fire('timeload', {
-		time: time
-            });
-	});
-        return;
-    },
-
-    isReady: function(time) {
-	return true;
-    },
-
-    _update: function() {
-	// switch to the appropriate time
-        if (!this._map)
-            return;
-	this._currentLoadedTime = this._timeDimension.getCurrentTime();
-	this._baseLayer.switchTimeVal(this._currentLoadedTime);
-    }
-});
-
-L.timeDimension.layer.layerSwitcher = function(layer, options) {
-    return new L.TimeDimension.Layer.LayerSwitcher(layer, options);
-};
-
+// helpful classes
 
 // extending the geojson time dimension layer to allow backward
 // trajectories
@@ -462,6 +229,8 @@ L.timeDimension.layer.geoJson2 = function(layer, options) {
     return new L.TimeDimension.Layer.GeoJson2(layer, options);
 };
 
+// fixing a minor bug which occurs when changing transition
+// times. See: https://github.com/socib/Leaflet.TimeDimension/pull/110
 L.TimeDimension.Player = L.TimeDimension.Player.extend({
     setTransitionTime: function(transitionTime) {
         this._transitionTime = transitionTime;
@@ -522,7 +291,7 @@ class Site {
 	this.data;
 	this.times;
 	this.heights;
-	// a layerSwitcher layer with contour topojson layers
+	// a layerArray layer with contour topojson layers
 	this.contours;
 	// ensemble trajectories
 	this.trajectories;
@@ -628,8 +397,7 @@ class Site {
 	    this2.heights = json['heights'];
 	    try {
 		// get the ensemble trajectories if they exist
-		var trajectories;
-		trajectories = json['trajectories'];
+		var trajectories = json['trajectories'];
 		var ens_trajectory_layer = L.geoJSON(trajectories, {
 		    style: this2.ensTrajStyle,
 		    onEachFeature: onEachTrajectory,
@@ -641,8 +409,7 @@ class Site {
 	    } catch(err) {}
 	    try {
 		// get the trajectory if it exists
-		var trajectory;
-		trajectory = json['trajectory'];
+		var trajectory = json['trajectory'];
 		var single_trajectory_layer = L.geoJSON(trajectory, {
 		    style: this2.singleTrajStyle,
 		    onEachFeature: onEachTrajectory,
@@ -653,24 +420,26 @@ class Site {
 		this2.trajectory = L.timeDimension.layer.geoJson2(single_trajectory_layer, traj_options);
 	    } catch(err) {}
 	    var folder = this2.folder;
-	    var makeLayer = function(ind) {
+	    var makeLayer = function(ind, cache, arr_ind) {
 		if (ind.some(function(x) {return x < 0})) {
 		    throw "Negative index in makeLayer";
 		}
 		var file = 'height' + ind[1] + '_time' + ind[0] + '.json';
-		var contour_path = folder + file;    
-		return L.topoJson(null, {
-		    style: contourStyle,
-		    onEachFeature: function(f, l) {onEachFeature(f, l)},
-		    smoothFactor: .5,
-		    file_path: contour_path
+		var contour_path = folder + file;
+		return $.getJSON(contour_path, function(topojson) {
+		    cache[arr_ind] = L.topoJson(topojson, {
+			style: contourStyle,
+			onEachFeature: function(f, l) {onEachFeature(f, l)},
+			smoothFactor: .5,
+			file_path: contour_path
+		    });
 		});
 	    }
 	    var ls_options = {values: [this2.times, this2.heights],
 			      makeLayer: makeLayer};
-	    this2.contours = L.layerSwitcher(ls_options);
+	    this2.contours = L.layerArray(ls_options);
 	    var td_options = {timeDimension: this2._hysplit.timedim};
-	    this2.td_layer = L.timeDimension.layer.layerSwitcher(this2.contours, td_options);
+	    this2.td_layer = L.timeDimension.layer.layerArray(this2.contours, td_options);
 	});
     }
 
