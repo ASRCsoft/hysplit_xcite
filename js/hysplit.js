@@ -1019,7 +1019,8 @@ class Hysplit {
 	    this._div = L.DomUtil.create('div', 'info accordion');
 	    $(this._div).accordion({
 		collapsible: true,
-		heightStyle: "content"
+		heightStyle: "content",
+		active: false
 	    });
 	    var custom_form = '<div><form id="hysplit" onSubmit="run_hysplit(); return false;">' +
 		'Latitude: <input type="text" name="lat"><br>' +
@@ -1031,7 +1032,8 @@ class Hysplit {
 	};
 	var this2 = this;
 	sim_info.update = function (props) {
-	    if ($('.accordion h4').length > 1) {
+	    var first_update = $('.accordion h4').length < 2;
+	    if (!first_update) {
 		$('.accordion').children().slice(0,2).remove();
 	    }
 	    var info_text;
@@ -1047,10 +1049,13 @@ class Hysplit {
 			'Release duration: ' + this2.cur_site.data["release_duration"] + ' hour(s)<br></div>';
 		} else {
 		    info_text += 'Arrival time: ' + this2.cur_site.data["release_time"] + ' UTC<br></div>'
-		}	
+		}
 	    }
 	    $(this._div).prepend(info_text);
 	    $(this._div).accordion('refresh');
+	    if (first_update) {
+	    	$(this._div).accordion("option", "active", 0);
+	    }
 	};
 	this.sim_info = sim_info.addTo(this.map);
     }
