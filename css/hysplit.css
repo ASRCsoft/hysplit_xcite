@@ -101,3 +101,8 @@ html .ui-button.ui-state-disabled:active {
 .leaflet-bar-timecontrol .leaflet-control-timecontrol {
     border: none;
 }
+
+/* keep the locator map from showing scrollbars */
+#locator {
+    overflow: hidden;
+}

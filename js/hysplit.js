@@ -868,9 +868,7 @@ class SiteSelector {
 	var site_info = L.control({position: 'topleft'});
 	site_info.onAdd = function (map) {
 	    this._div = L.DomUtil.create('div', 'info');
-	    this._div.innerHTML = '<h4>Current Site: <span id="cur_site">' +
-		this2.start_site + '</span></h4>' +
-		'Switch to: <span id="hov_site"></span>';
+	    this._div.innerHTML = 'Switch to: <span id="hov_site"></span>';
 	    this.update();
 	    return this._div;
 	};
@@ -981,10 +979,15 @@ class Hysplit {
 	/* 'store' locator div */
 	var locator = L.control({position: 'topright'});
 	locator.onAdd = function (map) {
-	    var div = L.DomUtil.create('div', 'info');
+	    var div = L.DomUtil.create('div', 'info accordion');
+	    $(div).append('<h4>Current Site: <span id="cur_site">(None)</span></h4>');
 	    var site_div = document.createElement("div");
 	    site_div.id = 'locator';
 	    div.appendChild(site_div);
+	    $(div).accordion({
+		collapsible: true,
+	    	heightStyle: "content"
+	    });
 	    return div;
 	};
 	locator.addTo(this.map);
@@ -1032,9 +1035,9 @@ class Hysplit {
 	};
 	var this2 = this;
 	sim_info.update = function (props) {
-	    var first_update = $('.accordion h4').length < 2;
+	    var first_update = $(this._div).children().length < 3;
 	    if (!first_update) {
-		$('.accordion').children().slice(0,2).remove();
+		$(this._div).children().slice(0,2).remove();
 	    }
 	    var info_text;
 	    info_text = '<h4>Simulation Info:</h4>';
