@@ -255,8 +255,7 @@ L.TimeDimension.Player = L.TimeDimension.Player.extend({
 // and while I'm here...
 
 // an empty layer that turns things off and on
-// omg this is pure madness
-L.FakeLayer = L.LayerGroup.extend({
+L.ToggleLayer = L.LayerGroup.extend({
     initialize: function(options) {
 	this.hysplit = options['hysplit'];
 	this.fwd = options['fwd'];
@@ -271,8 +270,8 @@ L.FakeLayer = L.LayerGroup.extend({
     }
 });
 
-L.fakeLayer = function(options) {
-    return new L.FakeLayer(options);
+L.toggleLayer = function(options) {
+    return new L.ToggleLayer(options);
 };
 
 
@@ -283,7 +282,8 @@ class Site {
 	this.fwd = fwd;
 	this._hysplit = hysplit;
 	this.contour_layer = this._hysplit.contour_layer;
-	this.trajectory_layer = this._hysplit.trajectory_layer;
+	this.ens_trajectory_layer = this._hysplit.ens_trajectory_layer;
+	this.single_trajectory_layer = this._hysplit.single_trajectory_layer;
 	// start at time and height = 0
 	this.time = 0;
 	this.height = 0;
@@ -292,7 +292,10 @@ class Site {
 	this.heights;
 	// a layerArray layer with contour topojson layers
 	this.contours;
-	this.trajectories;
+	// ensemble trajectories
+  	this.trajectories;
+	// single trajectory
+	this.trajectory;
 	this.getColor = this._hysplit.getColor;
 	this.time_slider;
 	this.height_slider;
@@ -347,11 +350,19 @@ class Site {
 	});
     }
 
-    trajStyle(feature) {
+    ensTrajStyle(feature) {
+  	return {
+  	    weight: 3,
+  	    opacity: .6,
+  	    color: '#5075DB'
+  	};
+    }
+
+    singleTrajStyle(feature) {
 	return {
 	    weight: 3,
 	    opacity: .6,
-	    color: '#5075DB'
+	    color: '#FF0033'
 	};
     }
 
@@ -525,7 +536,8 @@ class Site {
 
     clearLayers() {
 	this.contour_layer.clearLayers();
-	this.trajectory_layer.clearLayers();
+	this.ens_trajectory_layer.clearLayers();
+	this.single_trajectory_layer.clearLayers();
 	this.td_layer.remove();
     }
 
@@ -534,7 +546,8 @@ class Site {
 	    this.resetTimedim();
 	    this.setup_sliders(map);
 	    this.contour_layer.addLayer(this.contours);
-	    this.trajectory_layer.addLayer(this.trajectories);
+	    this.ens_trajectory_layer.addLayer(this.trajectories);
+	    this.single_trajectory_layer.addLayer(this.trajectory);
 	    this.td_layer.addTo(map);
 	}.bind(this));
     }
@@ -674,7 +687,8 @@ class Hysplit {
     constructor(sites_csv, start_site_name, start_site_fwd) {
 	this.sites_csv = sites_csv;
 	this.contour_layer = L.layerGroup([]);
-	this.trajectory_layer = L.layerGroup([]);
+	this.ens_trajectory_layer = L.layerGroup([]);
+	this.single_trajectory_layer = L.layerGroup([]);
 	this.origin_layer = L.layerGroup([]);
 	this.cur_name = start_site_name;
 	this.cur_fwd = start_site_fwd;
@@ -686,9 +700,9 @@ class Hysplit {
 	this.origin_circle;
 	this.timedim = L.timeDimension({times: []});
 	this.time_slider;
-	// make two fakelayers (fwd and bck) to include in the layer controller
-	this.fwd_layer = L.fakeLayer({hysplit: this, fwd: true});
-	this.bck_layer = L.fakeLayer({hysplit: this, fwd: false});
+	// make two toggleLayers (fwd and bck) to include in the layer controller
+	this.fwd_layer = L.toggleLayer({hysplit: this, fwd: true});
+	this.bck_layer = L.toggleLayer({hysplit: this, fwd: false});
     }
 
     get_sites() {
@@ -804,16 +818,11 @@ class Hysplit {
     
 	var sim_info = L.control({position: 'topright'});
 	sim_info.onAdd = function (map) { 
-             map.on('click', function(e){
-            var markerA = new L.marker(e.latlng); 
-            markerA.bindPopup(); 
-            var ll = markerA.getLatLng();   
-            document.querySelector('#userLat').value = ll.lat;
-            document.querySelector('#userLng').value= ll.lng;
-            //alert("latitude: " + ll.lat);
-            //alert("longitude: " + ll.lng);
-        }); 
 	    this._div = L.DomUtil.create('div', 'info accordion');
+	    // Disable clicking when user's cursor is on the info box
+	    // (because we need to keep the lat/lon from earlier mouse
+	    // clicks!)
+	    L.DomEvent.disableClickPropagation(this._div);
 	    $(this._div).accordion({
 		collapsible: true,
 		heightStyle: "content",
@@ -855,6 +864,14 @@ class Hysplit {
 	    }
 	};
 	this.sim_info = sim_info.addTo(this.map);
+	this.map.on('click', function(e) {
+	    var latlng = e.latlng;
+	    console.log(latlng);
+	    var lat = latlng.lat;
+	    var lon = latlng.lng;
+	    document.querySelector('#userLat').value = lat;
+	    document.querySelector('#userLng').value = lon;
+        }); 
     }
 
     addLayerControl() {
@@ -865,7 +882,8 @@ class Hysplit {
 	}
 	var overlayMaps = {
 	    'Contours': this2.contour_layer,
-	    'Trajectories': this2.trajectory_layer
+	    'Ensemble Trajectories': this2.ens_trajectory_layer,
+	    'Single Trajectory': this2.single_trajectory_layer
 	}
 	L.control.layers(baseMaps, overlayMaps, {position: 'topleft'}).addTo(this.map);
     }
@@ -883,7 +901,9 @@ class Hysplit {
 	    var site_name = this.cur_site.name;
 	    var site_fwd = this.cur_site.fwd;
 	    this.cached_sites[site_name][site_fwd] = this.cur_site;
-	    this.map = L.map(divid, {layers: [this.fwd_layer, this.contour_layer, this.trajectory_layer]}).
+	    this.map = L.map(divid, {layers: [this.fwd_layer, this.contour_layer,
+					      this.ens_trajectory_layer,
+					      this.single_trajectory_layer]}).
 		setView([43, -74.5], 7);
 	    this.addTileLayer();
 	    this.addSiteSelector();
