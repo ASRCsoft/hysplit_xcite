@@ -1016,34 +1016,41 @@ class Hysplit {
 	/* simulation info box */
 	var sim_info = L.control({position: 'topright'});
 	sim_info.onAdd = function (map) {
-	    this._div = L.DomUtil.create('div', 'info');
+	    this._div = L.DomUtil.create('div', 'info accordion');
+	    $(this._div).accordion({
+		collapsible: true,
+		heightStyle: "content"
+	    });
+	    var custom_form = '<div><form id="hysplit" onSubmit="run_hysplit(); return false;">' +
+		'Latitude: <input type="text" name="lat"><br>' +
+		'Longitude: <input type="text" name="lon"><br>' +
+		'<input type="submit" value="Click me to run the model"></form></div>';
+	    $(this._div).append('<h4>Custom Simulation:</h4>' + custom_form);
 	    this.update();
 	    return this._div;
 	};
 	var this2 = this;
 	sim_info.update = function (props) {
+	    if ($('.accordion h4').length > 1) {
+		$('.accordion').children().slice(0,2).remove();
+	    }
 	    var info_text;
-	    var custom_form;
 	    info_text = '<h4>Simulation Info:</h4>';
 	    if (this2.cur_site) {
-		info_text += '<p>Release site: ' + this2.cur_name + '<br>' +
+		info_text += '<div>Release site: ' + this2.cur_name + '<br>' +
 		    'Trajectory: ' + this2.fwd_str + '<br>' +
 		    'Latitude: ' + this2.cur_site.data['latitude'] + '&#176; N<br>' +
 		    'Longitude: ' + this2.cur_site.data['longitude'] + '&#176; W<br>' +
 		    'Release height: ' + this2.cur_site.data['release_height'] + 'm AGL<br>';
 		if (this2.cur_fwd) {
 		    info_text += 'Release time: ' + this2.cur_site.data["release_time"] + ' UTC<br>' +
-			'Release duration: ' + this2.cur_site.data["release_duration"] + ' hour(s)<br>';
+			'Release duration: ' + this2.cur_site.data["release_duration"] + ' hour(s)<br></div>';
 		} else {
-		    info_text += 'Arrival time: ' + this2.cur_site.data["release_time"] + ' UTC<br>'
+		    info_text += 'Arrival time: ' + this2.cur_site.data["release_time"] + ' UTC<br></div>'
 		}	
 	    }
-	    this._div.innerHTML = info_text;
-	    custom_form = '<form id="hysplit" onSubmit="run_hysplit(); return false;">' +
-		'Latitude: <input type="text" name="lat"><br>' +
-		'Longitude: <input type="text" name="lon"><br>' +
-		'<input type="submit" value="Click me to run the model"></form>';
-	    this._div.innerHTML += '<h4>Custom Simulation:</h4>' + custom_form;
+	    $(this._div).prepend(info_text);
+	    $(this._div).accordion('refresh');
 	};
 	this.sim_info = sim_info.addTo(this.map);
     }
