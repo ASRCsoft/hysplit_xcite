@@ -514,8 +514,7 @@ class Site {
 	this.fwd = fwd;
 	this._hysplit = hysplit;
 	this.contour_layer = this._hysplit.contour_layer;
-	this.ens_trajectory_layer = this._hysplit.ens_trajectory_layer;
-	this.single_trajectory_layer = this._hysplit.single_trajectory_layer;
+	this.trajectory_layer = this._hysplit.trajectory_layer;
 	// start at time and height = 0
 	this.time = 0;
 	this.height = 0;
@@ -524,10 +523,7 @@ class Site {
 	this.heights;
 	// a layerSwitcher layer with contour topojson layers
 	this.contours;
-	// ensemble trajectories
 	this.trajectories;
-	// single trajectory
-	this.trajectory;
 	this.getColor = this._hysplit.getColor;
 	this.time_slider;
 	this.height_slider;
@@ -582,19 +578,11 @@ class Site {
 	});
     }
 
-    ensTrajStyle(feature) {
+    trajStyle(feature) {
 	return {
 	    weight: 3,
 	    opacity: .6,
 	    color: '#5075DB'
-	};
-    }
-
-    singleTrajStyle(feature) {
-	return {
-	    weight: 3,
-	    opacity: .6,
-	    color: '#FF0033'
 	};
     }
 
@@ -627,30 +615,17 @@ class Site {
 	    this2.times = json['times'].map(function(text) {return new Date(text)});
 	    this2.heights = json['heights'];
 	    try {
-		// get the ensemble trajectories if they exist
+		// get the trajectory if it exists
 		var trajectories;
 		trajectories = json['trajectories'];
-		var ens_trajectory_layer = L.geoJSON(trajectories, {
-		    style: this2.ensTrajStyle,
+		var trajectory_layer = L.geoJSON(trajectories, {
+		    style: this2.trajStyle,
 		    onEachFeature: onEachTrajectory,
 		    smoothFactor: 1
 		});
 		var traj_options = {timeDimension: this2._hysplit.timedim,
 				    fwd: this2.fwd};
-		this2.trajectories = L.timeDimension.layer.geoJson2(ens_trajectory_layer, traj_options);
-	    } catch(err) {}
-	    try {
-		// get the trajectory if it exists
-		var trajectory;
-		trajectory = json['trajectory'];
-		var single_trajectory_layer = L.geoJSON(trajectory, {
-		    style: this2.singleTrajStyle,
-		    onEachFeature: onEachTrajectory,
-		    smoothFactor: 1
-		});
-		var traj_options = {timeDimension: this2._hysplit.timedim,
-				    fwd: this2.fwd};
-		this2.trajectory = L.timeDimension.layer.geoJson2(single_trajectory_layer, traj_options);
+		this2.trajectories = L.timeDimension.layer.geoJson2(trajectory_layer, traj_options);
 	    } catch(err) {}
 	    var folder = this2.folder;
 	    var makeLayer = function(ind) {
@@ -768,8 +743,7 @@ class Site {
 
     clearLayers() {
 	this.contour_layer.clearLayers();
-	this.ens_trajectory_layer.clearLayers();
-	this.single_trajectory_layer.clearLayers();
+	this.trajectory_layer.clearLayers();
 	this.td_layer.remove();
     }
 
@@ -778,8 +752,7 @@ class Site {
 	    this.resetTimedim();
 	    this.setup_sliders(map);
 	    this.contour_layer.addLayer(this.contours);
-	    this.ens_trajectory_layer.addLayer(this.trajectories);
-	    this.single_trajectory_layer.addLayer(this.trajectory);
+	    this.trajectory_layer.addLayer(this.trajectories);
 	    this.td_layer.addTo(map);
 	}.bind(this));
     }
@@ -824,8 +797,8 @@ class SiteSelector {
 	    fillOpacity: .6
 	});
 	this.site_info.update(marker['site_name']);
-    }
-
+    } 
+    
     mouseoutMarker(e) {
 	var marker = e.target;
 	marker.setStyle(marker['default_style']);
@@ -890,7 +863,7 @@ class SiteSelector {
     }
     
     addSiteInfo(map) {
-	/* site info box in the site locator map */
+	/* site info box in the site locator map */ 
 	var this2 = this;
 	var site_info = L.control({position: 'topleft'});
 	site_info.onAdd = function (map) {
@@ -919,8 +892,7 @@ class Hysplit {
     constructor(sites_csv, start_site_name, start_site_fwd) {
 	this.sites_csv = sites_csv;
 	this.contour_layer = L.layerGroup([]);
-	this.ens_trajectory_layer = L.layerGroup([]);
-	this.single_trajectory_layer = L.layerGroup([]);
+	this.trajectory_layer = L.layerGroup([]);
 	this.origin_layer = L.layerGroup([]);
 	this.cur_name = start_site_name;
 	this.cur_fwd = start_site_fwd;
@@ -1002,7 +974,7 @@ class Hysplit {
 	};
 	legend.addTo(this.map);
     }
-
+    
     addSiteSelector() {
 	/* 'store' locator div */
 	var locator = L.control({position: 'topright'});
@@ -1016,13 +988,15 @@ class Hysplit {
 		collapsible: true,
 	    	heightStyle: "content"
 	    });
-	    return div;
+	    return div; 
+        
 	};
 	locator.addTo(this.map);
 
-	// add map and background
+	// add map and background 
+ 
 	var site_map_options = {zoomControl: false,
-				attributionControl: false};
+				attributionControl: false}; 
 	this.site_map = L.map('locator', site_map_options).setView([43, -76], 6);
 	L.tileLayer('https://api.tiles.mapbox.com/v4/{id}/{z}/{x}/{y}.png?access_token=pk.eyJ1Ijoic2tlcHRpa29zIiwiYSI6ImNqNWU2NjNhYzAwcDEycWpqdTJtNWJmNGYifQ.kxK-j2hWsX46EhH5PnsTfA', {
 	    maxZoom: 18,
@@ -1042,24 +1016,34 @@ class Hysplit {
 	    return 'Backward';
 	}
     }
-
+     
     addSimInfo() {
-	/* simulation info box */
+	/* simulation info box */  
+    
 	var sim_info = L.control({position: 'topright'});
-	sim_info.onAdd = function (map) {
+	sim_info.onAdd = function (map) { 
+             map.on('click', function(e){
+            var markerA = new L.marker(e.latlng); 
+            markerA.bindPopup(); 
+            var ll = markerA.getLatLng();   
+            document.querySelector('#userLat').value = ll.lat;
+            document.querySelector('#userLng').value= ll.lng;
+            //alert("latitude: " + ll.lat);
+            //alert("longitude: " + ll.lng);
+        }); 
 	    this._div = L.DomUtil.create('div', 'info accordion');
 	    $(this._div).accordion({
 		collapsible: true,
 		heightStyle: "content",
 		active: false
-	    });
+	    }); 
 	    var custom_form = '<div><form id="hysplit" onSubmit="run_hysplit(); return false;">' +
-		'Latitude: <input type="text" name="lat"><br>' +
-		'Longitude: <input type="text" name="lon"><br>' +
+		'Latitude: <input id="userLat" type="text" name="lat" ><br>' +
+		'Longitude: <input id="userLng" type="text" name="lon"><br>' +
 		'<input type="submit" value="Click me to run the model"></form></div>';
 	    $(this._div).append('<h4>Custom Simulation:</h4>' + custom_form);
 	    this.update();
-	    return this._div;
+	    return this._div; 
 	};
 	var this2 = this;
 	sim_info.update = function (props) {
@@ -1099,8 +1083,7 @@ class Hysplit {
 	}
 	var overlayMaps = {
 	    'Contours': this2.contour_layer,
-	    'Ensemble Trajectories': this2.ens_trajectory_layer,
-	    'Single Trajectory': this2.single_trajectory_layer
+	    'Trajectories': this2.trajectory_layer
 	}
 	L.control.layers(baseMaps, overlayMaps, {position: 'topleft'}).addTo(this.map);
     }
@@ -1118,9 +1101,7 @@ class Hysplit {
 	    var site_name = this.cur_site.name;
 	    var site_fwd = this.cur_site.fwd;
 	    this.cached_sites[site_name][site_fwd] = this.cur_site;
-	    this.map = L.map(divid, {layers: [this.fwd_layer, this.contour_layer,
-					      this.ens_trajectory_layer,
-					      this.single_trajectory_layer]}).
+	    this.map = L.map(divid, {layers: [this.fwd_layer, this.contour_layer, this.trajectory_layer]}).
 		setView([43, -74.5], 7);
 	    this.addTileLayer();
 	    this.addSiteSelector();
