@@ -514,7 +514,8 @@ class Site {
 	this.fwd = fwd;
 	this._hysplit = hysplit;
 	this.contour_layer = this._hysplit.contour_layer;
-	this.trajectory_layer = this._hysplit.trajectory_layer;
+	this.ens_trajectory_layer = this._hysplit.ens_trajectory_layer;
+	this.single_trajectory_layer = this._hysplit.single_trajectory_layer;
 	// start at time and height = 0
 	this.time = 0;
 	this.height = 0;
@@ -523,7 +524,10 @@ class Site {
 	this.heights;
 	// a layerSwitcher layer with contour topojson layers
 	this.contours;
+	// ensemble trajectories
 	this.trajectories;
+	// single trajectory
+	this.trajectory;
 	this.getColor = this._hysplit.getColor;
 	this.time_slider;
 	this.height_slider;
@@ -578,11 +582,19 @@ class Site {
 	});
     }
 
-    trajStyle(feature) {
+    ensTrajStyle(feature) {
 	return {
 	    weight: 3,
 	    opacity: .6,
 	    color: '#5075DB'
+	};
+    }
+
+    singleTrajStyle(feature) {
+	return {
+	    weight: 3,
+	    opacity: .6,
+	    color: '#FF0033'
 	};
     }
 
@@ -615,17 +627,30 @@ class Site {
 	    this2.times = json['times'].map(function(text) {return new Date(text)});
 	    this2.heights = json['heights'];
 	    try {
-		// get the trajectory if it exists
+		// get the ensemble trajectories if they exist
 		var trajectories;
 		trajectories = json['trajectories'];
-		var trajectory_layer = L.geoJSON(trajectories, {
-		    style: this2.trajStyle,
+		var ens_trajectory_layer = L.geoJSON(trajectories, {
+		    style: this2.ensTrajStyle,
 		    onEachFeature: onEachTrajectory,
 		    smoothFactor: 1
 		});
 		var traj_options = {timeDimension: this2._hysplit.timedim,
 				    fwd: this2.fwd};
-		this2.trajectories = L.timeDimension.layer.geoJson2(trajectory_layer, traj_options);
+		this2.trajectories = L.timeDimension.layer.geoJson2(ens_trajectory_layer, traj_options);
+	    } catch(err) {}
+	    try {
+		// get the trajectory if it exists
+		var trajectory;
+		trajectory = json['trajectory'];
+		var single_trajectory_layer = L.geoJSON(trajectory, {
+		    style: this2.singleTrajStyle,
+		    onEachFeature: onEachTrajectory,
+		    smoothFactor: 1
+		});
+		var traj_options = {timeDimension: this2._hysplit.timedim,
+				    fwd: this2.fwd};
+		this2.trajectory = L.timeDimension.layer.geoJson2(single_trajectory_layer, traj_options);
 	    } catch(err) {}
 	    var folder = this2.folder;
 	    var makeLayer = function(ind) {
@@ -743,7 +768,8 @@ class Site {
 
     clearLayers() {
 	this.contour_layer.clearLayers();
-	this.trajectory_layer.clearLayers();
+	this.ens_trajectory_layer.clearLayers();
+	this.single_trajectory_layer.clearLayers();
 	this.td_layer.remove();
     }
 
@@ -752,7 +778,8 @@ class Site {
 	    this.resetTimedim();
 	    this.setup_sliders(map);
 	    this.contour_layer.addLayer(this.contours);
-	    this.trajectory_layer.addLayer(this.trajectories);
+	    this.ens_trajectory_layer.addLayer(this.trajectories);
+	    this.single_trajectory_layer.addLayer(this.trajectory);
 	    this.td_layer.addTo(map);
 	}.bind(this));
     }
@@ -892,7 +919,8 @@ class Hysplit {
     constructor(sites_csv, start_site_name, start_site_fwd) {
 	this.sites_csv = sites_csv;
 	this.contour_layer = L.layerGroup([]);
-	this.trajectory_layer = L.layerGroup([]);
+	this.ens_trajectory_layer = L.layerGroup([]);
+	this.single_trajectory_layer = L.layerGroup([]);
 	this.origin_layer = L.layerGroup([]);
 	this.cur_name = start_site_name;
 	this.cur_fwd = start_site_fwd;
@@ -1071,7 +1099,8 @@ class Hysplit {
 	}
 	var overlayMaps = {
 	    'Contours': this2.contour_layer,
-	    'Trajectories': this2.trajectory_layer
+	    'Ensemble Trajectories': this2.ens_trajectory_layer,
+	    'Single Trajectory': this2.single_trajectory_layer
 	}
 	L.control.layers(baseMaps, overlayMaps, {position: 'topleft'}).addTo(this.map);
     }
@@ -1089,7 +1118,9 @@ class Hysplit {
 	    var site_name = this.cur_site.name;
 	    var site_fwd = this.cur_site.fwd;
 	    this.cached_sites[site_name][site_fwd] = this.cur_site;
-	    this.map = L.map(divid, {layers: [this.fwd_layer, this.contour_layer, this.trajectory_layer]}).
+	    this.map = L.map(divid, {layers: [this.fwd_layer, this.contour_layer,
+					      this.ens_trajectory_layer,
+					      this.single_trajectory_layer]}).
 		setView([43, -74.5], 7);
 	    this.addTileLayer();
 	    this.addSiteSelector();
