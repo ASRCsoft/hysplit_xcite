@@ -836,7 +836,7 @@ class Hysplit {
 		'<input type="radio" name="fwd" value="True" checked>Forward<br>' +
 		'<input type="radio" name="fwd" value="">Backward<br>' +
 		'Recorded Hours: <input type="text" name="records" value="10"><br>' +
-		'<input type="submit" value="Click me to run the model"></form>' +
+		'<input type="submit" value="Run HYSPLIT"></form>' +
 		'<p id="hysplit_message"></p></div>';
 	    $(this._div).append('<h4>Custom Simulation:</h4>' + custom_form);
 	    // set up the call to the flask server
