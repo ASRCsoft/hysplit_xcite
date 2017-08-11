@@ -866,7 +866,6 @@ class Hysplit {
 	this.sim_info = sim_info.addTo(this.map);
 	this.map.on('click', function(e) {
 	    var latlng = e.latlng;
-	    console.log(latlng);
 	    var lat = latlng.lat;
 	    var lon = latlng.lng;
 	    document.querySelector('#userLat').value = lat;

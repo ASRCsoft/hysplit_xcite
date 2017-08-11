@@ -12,6 +12,7 @@ L.LayerArray = L.LayerGroup.extend({
 	this.lazy = options['lazy'] || true;
 	this.dims = this.values.map(function(x) {return x.length});
 	this.ndim = this.dims.length;
+	this.ind;
 	this.time = 0;
 	this.height = 0;
 	// and array of boolean values to keep from loading previously
@@ -58,6 +59,7 @@ L.LayerArray = L.LayerGroup.extend({
 	}
     },
     setIndex: function(ind) {
+	this.ind = ind;
 	this.time = ind[0];
 	this.height = ind[1];
     },
@@ -95,6 +97,17 @@ L.LayerArray = L.LayerGroup.extend({
 	this.addIndex(ind);
 	this.setIndex(ind);
     },
+    switchDim: function(dim, ind) {
+	// make a copy of the current index
+	var new_ind = [];
+	for (i=0; i<this.ind.length; i++) {
+	    new_ind[i] = this.ind[i];
+	}
+	// update it
+	new_ind[dim] = ind;
+	// switch to it
+	this.switchToIndex(new_ind);
+    },
     // and some special functions just for us
     switchTimeVal: function(t) {
 	var time_index = this.values[0].indexOf(t);
@@ -106,6 +119,11 @@ L.LayerArray = L.LayerGroup.extend({
     loadTime: function(t) {
 	var time_index = this.values[0].indexOf(t);
 	return this.loadLayer([time_index, this.height]);
+    },
+    makeSlider: function(dim, orientation='vertical') {
+	var slider_options = {layerArray: this, dim: dim,
+			      orientation: orientation};
+	return L.control.arraySlider(slider_options);
     }
 });
 
@@ -114,7 +132,60 @@ L.layerArray = function(layers, options) {
 };
 
 
-// based on advice here: https://github.com/socib/Leaflet.TimeDimension/issues/19
+
+L.Control.ArraySlider = L.Control.extend({
+    // this is going to have the dimension number and layerarray object
+    onAdd: function() {
+	var layerArray = this.options.layerArray;
+	var dim = this.options.dim;
+	var labels = layerArray.values[dim];
+	var dim_length = labels.length;
+	var orientation = this.options.orientation;
+	// set up the div if it isn't there already
+	this._div = L.DomUtil.create('div', 'info vertical-axis');
+	// var grades = levels,
+	//     labels = [];
+	var range_title = '<h4>Height</h4>'
+	var range = '<div id="height_slider2"></div>'
+	this._div.innerHTML = range_title + range;
+	var slider = $(this._div).find('div')[0];
+	var switch_fn = function(e, ui) {
+	    this.switchDim(dim, ui.value);
+	}.bind(layerArray);
+
+	// set up the jquery slider
+	var slider_options = {max: dim_length - 1, orientation: orientation,
+			      slide: switch_fn, change: switch_fn};
+
+	// get the slider labels
+	var pip_options = {rest: 'label', labels: labels};
+	$(slider).slider(slider_options).slider("pips", pip_options);
+	// set the slider height
+	var slider_height = (25 * (dim_length - 1)) + 'px';
+	$(slider)[0].style.height = slider_height;
+
+	// Disable dragging when user's cursor enters the element
+	// courtesy of https://gis.stackexchange.com/a/104609
+	this._div.addEventListener('mouseover', function (e) {
+            this._map.dragging.disable();
+	}.bind(this));
+	// Re-enable dragging when user's cursor leaves the element
+	this._div.addEventListener('mouseout', function (e) {
+            this._map.dragging.enable();
+	}.bind(this));
+	
+	return this._div;
+    }
+})
+
+L.control.arraySlider = function(options) {
+    return new L.Control.ArraySlider(options);
+};
+
+
+// A layerArray-compatible timedimension layer (from
+// leaflet.timedimension). Based on advice here:
+// https://github.com/socib/Leaflet.TimeDimension/issues/19
 L.TimeDimension.Layer.LayerArray = L.TimeDimension.Layer.extend({
 
     initialize: function(layer, options) {
