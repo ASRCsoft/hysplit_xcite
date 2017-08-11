@@ -817,6 +817,7 @@ class Hysplit {
 	/* simulation info box */  
     
 	var sim_info = L.control({position: 'topright'});
+	var hysplit = this;
 	sim_info.onAdd = function (map) { 
 	    this._div = L.DomUtil.create('div', 'info accordion');
 	    // Disable clicking when user's cursor is on the info box
@@ -827,12 +828,44 @@ class Hysplit {
 		collapsible: true,
 		heightStyle: "content",
 		active: false
-	    }); 
-	    var custom_form = '<div><form id="hysplit" onSubmit="run_hysplit(); return false;">' +
-		'Latitude: <input id="userLat" type="text" name="lat" ><br>' +
+	    });
+	    var custom_form = '<div><form id="hysplit" onSubmit="return false;">' +
+		'Latitude: <input id="userLat" type="text" name="lat"><br>' +
 		'Longitude: <input id="userLng" type="text" name="lon"><br>' +
-		'<input type="submit" value="Click me to run the model"></form></div>';
+		'Height (m AGL): <input type="text" name="height" value="250"><br>' +
+		'<input type="radio" name="fwd" value="True" checked>Forward<br>' +
+		'<input type="radio" name="fwd" value="">Backward<br>' +
+		'Recorded Hours: <input type="text" name="records" value="10"><br>' +
+		'<input type="submit" value="Click me to run the model"></form>' +
+		'<p id="hysplit_message"></p></div>';
 	    $(this._div).append('<h4>Custom Simulation:</h4>' + custom_form);
+	    // set up the call to the flask server
+	    $(this._div).find('#hysplit').submit(function() {
+		$('#hysplit_message').text('');
+		var records = $(this).find('input[name="records"]').val();
+		if (parseInt(records) > 24) {
+		    $('#hysplit_message').text("Error: Can't record more than 24 hours.");
+		    return false;
+		}
+		var url = 'http://appsvr.asrc.cestm.albany.edu:5000?' + $(this).serialize();
+		var fwd = $(this).find('input[name="fwd"]:checked').val();
+		var fwd_bool;
+		if (fwd == 'True') {
+		    fwd_bool = true;
+		} else {
+		    fwd_bool = false;
+		}
+		$('#hysplit_message').text('Running HYSPLIT...');
+		$.post(url, function(text) {
+		    var id = text;
+		    $('#hysplit_message')[0].innerHTML += ' Done. Simulation ID:<br>' + id;
+		    // add the site id to the hysplit site cache
+		    hysplit.cached_sites[id] = {};
+		    hysplit.cached_sites[id][fwd_bool] = null;
+		    hysplit.changeSite(id, fwd_bool);
+		}.bind(this));
+	    });
+	    console.log(this._div);
 	    this.update();
 	    return this._div; 
 	};
@@ -864,6 +897,7 @@ class Hysplit {
 	    }
 	};
 	this.sim_info = sim_info.addTo(this.map);
+	// set up the lat/lon action
 	this.map.on('click', function(e) {
 	    var latlng = e.latlng;
 	    console.log(latlng);
