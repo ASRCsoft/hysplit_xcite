@@ -486,7 +486,7 @@ class Site {
 		this._div = L.DomUtil.create('div', 'info vertical-axis');
 		var grades = levels,
 		    labels = [];
-		var range_title = '<h4>Height</h4>'
+		var range_title = '<h4>Height AGL</h4>'
 		var range = '<div id="height_slider2"></div>'
 		this._div.innerHTML = range_title + range;
 	    }
@@ -750,7 +750,7 @@ class Hysplit {
 		grades = levels,
 		labels = [],
 		from, to;
-	    var legend_title = '<h4>PM Levels</h4>';
+	    var legend_title = '<h4>Concentration</h4>';
 	    var units;
 	    if (this2.cur_site.heights[this2.cur_site.height] == 0) {
 		units = 'ng/m<sup>2</sup>';
@@ -858,7 +858,15 @@ class Hysplit {
 		$('#hysplit_message').text('Running HYSPLIT...');
 		$.post(url, function(text) {
 		    var id = text;
-		    $('#hysplit_message')[0].innerHTML += ' Done. Simulation ID:<br>' + id;
+		    var fwd_str;
+		    if (fwd_bool) {
+			fwd_str = 'fwd';
+		    } else {
+			fwd_str = 'bwd';
+		    }
+		    var website = 'http://appsvr.asrc.cestm.albany.edu/~xcite/hysplit_xcite/';
+		    $('#hysplit_message')[0].innerHTML +=
+			' Done. View raw data <a href="' + website + 'data/' + id + '/' + fwd_str + '" target="_blank">here<a>.';
 		    // add the site id to the hysplit site cache
 		    hysplit.cached_sites[id] = {};
 		    hysplit.cached_sites[id][fwd_bool] = null;
