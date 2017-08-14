@@ -833,8 +833,8 @@ class Hysplit {
 		'Latitude: <input id="userLat" type="text" name="lat"><br>' +
 		'Longitude: <input id="userLng" type="text" name="lon"><br>' +
 		'Height (m AGL): <input type="text" name="height" value="250"><br>' +
-		'<input type="radio" name="fwd" value="True" checked>Forward<br>' +
-		'<input type="radio" name="fwd" value="">Backward<br>' +
+		'<input type="checkbox" name="fwd" value="true" checked>Forward<br>' +
+		'<input type="checkbox" name="fwd" value="false">Backward<br>' +
 		'Recorded Hours: <input type="text" name="records" value="10"><br>' +
 		'<input type="submit" value="Run HYSPLIT"></form>' +
 		'<p id="hysplit_message"></p></div>';
@@ -847,19 +847,32 @@ class Hysplit {
 		    $('#hysplit_message').text("Error: Can't record more than 24 hours.");
 		    return false;
 		}
-		var url = 'http://appsvr.asrc.cestm.albany.edu:5000?' + $(this).serialize();
-		var fwd = $(this).find('input[name="fwd"]:checked').val();
-		var fwd_bool;
-		if (fwd == 'True') {
-		    fwd_bool = true;
-		} else {
-		    fwd_bool = false;
+		// make sure either forward or backward is checked
+		var fwd = $(this).find('input:checkbox:checked').map(function() {
+		    return $(this).val();
+		}).get();
+		var fwd_param;
+		var fwd_true = fwd.indexOf('true') > -1;
+		var bwd_true = fwd.indexOf('false') > -1;
+		if (!fwd_true && !bwd_true) {
+		    $('#hysplit_message').text("Error: Must check either forward or backward.");
+		    return false;
 		}
+		// if (fwd_true) {
+		//     fwd_param = 'fwd';
+		//     if (bwd_true) {
+		// 	fwd_param = 'both';
+		//     }
+		// } else if (bwd_true) {
+		//     fwd_param = 'bwd';
+		// }
+		var url = 'http://appsvr.asrc.cestm.albany.edu:5000?' + $(this).serialize();
+
 		$('#hysplit_message').text('Running HYSPLIT...');
 		$.post(url, function(text) {
 		    var id = text;
 		    var fwd_str;
-		    if (fwd_bool) {
+		    if (fwd_true) {
 			fwd_str = 'fwd';
 		    } else {
 			fwd_str = 'bwd';
@@ -869,8 +882,8 @@ class Hysplit {
 			' Done. View raw data <a href="' + website + 'data/' + id + '/' + fwd_str + '" target="_blank">here<a>.';
 		    // add the site id to the hysplit site cache
 		    hysplit.cached_sites[id] = {};
-		    hysplit.cached_sites[id][fwd_bool] = null;
-		    hysplit.changeSite(id, fwd_bool);
+		    hysplit.cached_sites[id][fwd_true] = null;
+		    hysplit.changeSite(id, fwd_true);
 		}.bind(this));
 	    });
 	    console.log(this._div);
