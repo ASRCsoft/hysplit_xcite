@@ -251,8 +251,7 @@ L.TimeDimension.Player = L.TimeDimension.Player.extend({
     }
 });
 
-// fixing a minor bug which occurs when changing transition
-// times. See: https://github.com/socib/Leaflet.TimeDimension/pull/110
+// changing the time format
 L.Control.TimeDimension = L.Control.TimeDimension.extend({
     _toggleDateUTC: function() {
         // if (this._dateUTC) {
@@ -956,7 +955,7 @@ class Hysplit {
 	    'Backward': this2.bck_layer
 	}
 	var overlayMaps = {
-	    'Contours': this2.contour_layer,
+	    'Concentration': this2.contour_layer,
 	    'Ensemble Trajectories': this2.ens_trajectory_layer,
 	    'Single Trajectory': this2.single_trajectory_layer
 	}
