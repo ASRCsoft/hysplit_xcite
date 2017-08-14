@@ -251,6 +251,33 @@ L.TimeDimension.Player = L.TimeDimension.Player.extend({
     }
 });
 
+// fixing a minor bug which occurs when changing transition
+// times. See: https://github.com/socib/Leaflet.TimeDimension/pull/110
+L.Control.TimeDimension = L.Control.TimeDimension.extend({
+    _toggleDateUTC: function() {
+        // if (this._dateUTC) {
+        //     L.DomUtil.removeClass(this._displayDate, 'utc');
+        //     this._displayDate.title = 'Local Time';
+        // } else {
+        //     L.DomUtil.addClass(this._displayDate, 'utc');
+        //     this._displayDate.title = 'UTC Time';
+        // }
+        // this._dateUTC = !this._dateUTC;
+        // this._update();
+    },
+    _getDisplayDateFormat: function(date) {
+	var year = date.getUTCFullYear();
+	var month = ("00" + (date.getUTCMonth() + 1)).slice(-2);
+	var day = ("00" + date.getUTCDate()).slice(-2);
+	var hour = ("00" + date.getUTCHours()).slice(-2);
+	// return this._dateUTC ? date.toISOString() : date.toLocaleString();
+	return this._dateUTC ? year + '-' + month + '-' + day + ' ' + hour + ':00 UTC' :
+	    date.toLocaleString();
+    }
+});
+
+
+
 
 // and while I'm here...
 
