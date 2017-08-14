@@ -832,10 +832,10 @@ class Hysplit {
 	    var custom_form = '<div><form id="hysplit" onSubmit="return false;">' +
 		'Latitude: <input id="userLat" type="text" name="lat"><br>' +
 		'Longitude: <input id="userLng" type="text" name="lon"><br>' +
-		'Height (m AGL): <input type="text" name="height" value="250"><br>' +
+		'Height (m AGL): <input type="text" name="height" value="10"><br>' +
 		'<input type="checkbox" name="fwd" value="true" checked>Forward<br>' +
 		'<input type="checkbox" name="fwd" value="false">Backward<br>' +
-		'Recorded Hours: <input type="text" name="records" value="10"><br>' +
+		'Simulated hours: <input type="text" name="records" value="10"><br>' +
 		'<input type="submit" value="Run HYSPLIT"></form>' +
 		'<p id="hysplit_message"></p></div>';
 	    $(this._div).append('<h4>Custom Simulation:</h4>' + custom_form);
@@ -843,29 +843,20 @@ class Hysplit {
 	    $(this._div).find('#hysplit').submit(function() {
 		$('#hysplit_message').text('');
 		var records = $(this).find('input[name="records"]').val();
-		if (parseInt(records) > 24) {
-		    $('#hysplit_message').text("Error: Can't record more than 24 hours.");
+		if (parseInt(records) > 18) {
+		    $('#hysplit_message').text("Error: Can't simulate more than 18 hours.");
 		    return false;
 		}
 		// make sure either forward or backward is checked
 		var fwd = $(this).find('input:checkbox:checked').map(function() {
 		    return $(this).val();
 		}).get();
-		var fwd_param;
 		var fwd_true = fwd.indexOf('true') > -1;
 		var bwd_true = fwd.indexOf('false') > -1;
 		if (!fwd_true && !bwd_true) {
-		    $('#hysplit_message').text("Error: Must check either forward or backward.");
+		    $('#hysplit_message').text("Error: Must select forward or backward.");
 		    return false;
 		}
-		// if (fwd_true) {
-		//     fwd_param = 'fwd';
-		//     if (bwd_true) {
-		// 	fwd_param = 'both';
-		//     }
-		// } else if (bwd_true) {
-		//     fwd_param = 'bwd';
-		// }
 		var url = 'http://appsvr.asrc.cestm.albany.edu:5000?' + $(this).serialize();
 
 		$('#hysplit_message').text('Running HYSPLIT...');
@@ -890,7 +881,7 @@ class Hysplit {
 	    this.update();
 	    return this._div; 
 	};
-	var this2 = this;
+	var hysplit = this;
 	sim_info.update = function (props) {
 	    var first_update = $(this._div).children().length < 3;
 	    if (!first_update) {
@@ -898,17 +889,18 @@ class Hysplit {
 	    }
 	    var info_text;
 	    info_text = '<h4>Simulation Info:</h4>';
-	    if (this2.cur_site) {
-		info_text += '<div>Release site: ' + this2.cur_name + '<br>' +
-		    'Trajectory: ' + this2.fwd_str + '<br>' +
-		    'Latitude: ' + this2.cur_site.data['latitude'] + '&#176; N<br>' +
-		    'Longitude: ' + this2.cur_site.data['longitude'] + '&#176; W<br>' +
-		    'Release height: ' + this2.cur_site.data['release_height'] + 'm AGL<br>';
-		if (this2.cur_fwd) {
-		    info_text += 'Release time: ' + this2.cur_site.data["release_time"] + ' UTC<br>' +
-			'Release duration: ' + this2.cur_site.data["release_duration"] + ' hour(s)<br></div>';
+	    if (hysplit.cur_site) {
+		info_text += '<div>Release site: ' + hysplit.cur_name + '<br>' +
+		    'Trajectory: ' + hysplit.fwd_str + '<br>' +
+		    'Latitude: ' + hysplit.cur_site.data['latitude'] + '&#176; N<br>' +
+		    'Longitude: ' + hysplit.cur_site.data['longitude'] + '&#176; W<br>';		    
+		if (hysplit.cur_fwd) {
+		    info_text += 'Release height: ' + hysplit.cur_site.data['release_height'] + 'm AGL<br>' +
+			'Release time: ' + hysplit.cur_site.data["release_time"] + ' UTC<br>' +
+			'Release duration: ' + hysplit.cur_site.data["release_duration"] + ' hour(s)<br></div>';
 		} else {
-		    info_text += 'Arrival time: ' + this2.cur_site.data["release_time"] + ' UTC<br></div>'
+		    info_text += 'Receptor height: ' + hysplit.cur_site.data['release_height'] + 'm AGL<br>' +
+			'Reception time: ' + hysplit.cur_site.data["release_time"] + ' UTC<br></div>';
 		}
 	    }
 	    $(this._div).prepend(info_text);
