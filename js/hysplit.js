@@ -860,6 +860,7 @@ class Hysplit {
 		var url = 'http://appsvr.asrc.cestm.albany.edu:5000?' + $(this).serialize();
 
 		$('#hysplit_message').text('Running HYSPLIT...');
+		hysplit.map.spin(true, {scale: 2.5});
 		$.post(url, function(text) {
 		    var id = text;
 		    var fwd_str;
@@ -875,6 +876,7 @@ class Hysplit {
 		    hysplit.cached_sites[id] = {};
 		    hysplit.cached_sites[id][fwd_true] = null;
 		    hysplit.changeSite(id, fwd_true);
+		    hysplit.map.spin(false);
 		}.bind(this));
 	    });
 	    console.log(this._div);
