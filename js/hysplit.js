@@ -891,8 +891,19 @@ class Hysplit {
 
 		$('#hysplit_message').text('Running HYSPLIT...');
 		hysplit.map.spin(true, {scale: 2.5});
-		$.post(url, function(text) {
-		    var id = text;
+		$.post(url, function(data) {
+		    // check for errors
+		    if (data['error']) {
+			$('#hysplit_message').text(data['error']);
+			// hysplit.map.spin(false);
+			// return false;
+		    } else {
+			$('#hysplit_message')[0].innerHTML += ' Done.';
+		    }
+		    $('#hysplit_message')[0].innerHTML +=
+			'<br>Simulations took ' + data['seconds'] + ' seconds.';
+		    // get the path to the simulation results
+		    var id = data['id'];
 		    var fwd_str;
 		    if (fwd_true) {
 			fwd_str = 'fwd';
@@ -900,14 +911,15 @@ class Hysplit {
 			fwd_str = 'bwd';
 		    }
 		    var website = 'http://appsvr.asrc.cestm.albany.edu/~xcite/hysplit_xcite/';
+		    var data_dir = website + 'data/' + id + '/' + (fwd_true && bwd_true ? '' : fwd_str);
 		    $('#hysplit_message')[0].innerHTML +=
-			' Done. View raw data <a href="' + website + 'data/' + id + '/' + fwd_str + '" target="_blank">here<a>.';
+			'<br>View raw data <a href="' + data_dir + '" target="_blank">here<a>.';
 		    // add the site id to the hysplit site cache
 		    hysplit.cached_sites[id] = {};
 		    hysplit.cached_sites[id][fwd_true] = null;
 		    hysplit.changeSite(id, fwd_true);
 		    hysplit.map.spin(false);
-		}.bind(this));
+		}.bind(this), 'json');
 	    });
 	    console.log(this._div);
 	    this.update();
@@ -1022,13 +1034,14 @@ class Hysplit {
 		// not adding anything to the map
 		hysplit.update_info();
 	    };
+	    var site;
 	    if (!this.cached_sites[name][fwd]) {
-		var site;
 		site = new Site(name, fwd, this);
 		this.cached_sites[name][fwd] = site;
 		site.loadData().done(f.bind(site)).fail(f_fail);
 	    } else {
-		f();
+		site = this.cached_sites[name][fwd];
+		f.bind(site)();
 	    }
 	}
     }
