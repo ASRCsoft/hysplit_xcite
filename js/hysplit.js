@@ -872,6 +872,8 @@ class Hysplit {
 	    // set up the call to the flask server
 	    $(this._div).find('#hysplit').submit(function() {
 		$('#hysplit_message').text('');
+		// check that the form values are allowable
+		// make sure the number of hours is acceptable
 		var records = $(this).find('input[name="records"]').val();
 		if (parseInt(records) > 18) {
 		    $('#hysplit_message').text("Error: Can't simulate more than 18 hours.");
@@ -887,6 +889,23 @@ class Hysplit {
 		    $('#hysplit_message').text("Error: Must select forward or backward.");
 		    return false;
 		}
+		// make sure latitude and longitude are acceptable
+		var lat = parseFloat($(this).find('input[name="lat"]').val());
+		var lon = parseFloat($(this).find('input[name="lon"]').val());
+		if (lat < 40 || lat > 46.5) {
+		    $('#hysplit_message').text("Error: Latitude must be between 40 and 46.5.");
+		    return false;
+		}
+		if (lon < -82.5 || lon > -69.5) {
+		    $('#hysplit_message').text("Error: Latitude must be between -82.5 and -69.5.");
+		    return false;
+		}
+		// check height
+		var height = parseFloat($(this).find('input[name="height"]').val());
+		if (height < 0 || height > 200) {
+		    $('#hysplit_message').text("Error: Height must be between 0 and 200.");
+		    return false;
+		}
 		var url = 'http://appsvr.asrc.cestm.albany.edu:5000?' + $(this).serialize();
 
 		$('#hysplit_message').text('Running HYSPLIT...');
@@ -894,7 +913,7 @@ class Hysplit {
 		$.post(url, function(data) {
 		    // check for errors
 		    if (data['error']) {
-			$('#hysplit_message').text(data['error']);
+			$('#hysplit_message').text('Error: ' + data['error']);
 			// hysplit.map.spin(false);
 			// return false;
 		    } else {
@@ -921,7 +940,6 @@ class Hysplit {
 		    hysplit.map.spin(false);
 		}.bind(this), 'json');
 	    });
-	    console.log(this._div);
 	    this.update();
 	    return this._div; 
 	};
