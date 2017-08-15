@@ -138,14 +138,15 @@ L.Control.ArraySlider = L.Control.extend({
     onAdd: function() {
 	var layerArray = this.options.layerArray;
 	var dim = this.options.dim;
-	var labels = layerArray.values[dim];
+	var labels = this.options.labels ? this.options.labels : layerArray.values[dim];
 	var dim_length = labels.length;
 	var orientation = this.options.orientation;
+	var title = this.options.title ? this.options.title : '';
 	// set up the div if it isn't there already
 	this._div = L.DomUtil.create('div', 'info vertical-axis');
 	// var grades = levels,
 	//     labels = [];
-	var range_title = '<h4>Height</h4>'
+	var range_title = '<h4>' + title + '</h4>'
 	var range = '<div id="height_slider2"></div>'
 	this._div.innerHTML = range_title + range;
 	var slider = $(this._div).find('div')[0];

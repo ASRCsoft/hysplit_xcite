@@ -504,46 +504,24 @@ class Site {
     }
 
     createHeightSlider() {
-	this.height_slider = L.control({position: 'bottomleft'});
-	var slider = this.height_slider;
-	slider.onAdd = function (map) {
-	    if (!this._div) {
-		// set up the div if it isn't there already
-		this._div = L.DomUtil.create('div', 'info vertical-axis');
-		var grades = levels,
-		    labels = [];
-		var range_title = '<h4>Height AGL</h4>'
-		var range = '<div id="height_slider2"></div>'
-		this._div.innerHTML = range_title + range;
-	    }
-	    return this._div;
-	};
-	var map = this._hysplit.map;
-	slider.addTo(map);
-	// Disable dragging when user's cursor enters the element
-	// courtesy of https://gis.stackexchange.com/a/104609
-	slider.getContainer().addEventListener('mouseover', function () {
-            map.dragging.disable();
-	});
-	// Re-enable dragging when user's cursor leaves the element
-	slider.getContainer().addEventListener('mouseout', function () {
-            map.dragging.enable();
-	});
-	// set up the jquery slider
+	// make a height slider using the contour layerArray
+
+	// put together some fancy labels first
 	var nheights = this.heights.length;
-	var slider_options = {max: nheights - 1, orientation: "vertical",
-			      slide: this.changeHeight.bind(this),
-			      change: this.changeHeight.bind(this)};
-	// get the slider labels
 	var labels = [];
 	for (i = 0; i < nheights; i++) {
 	    labels.push(this.makeHeightLabel(i))
 	}
-	var pip_options = {rest: 'label', labels: labels};
-	$('#height_slider2').slider(slider_options).slider("pips", pip_options);
-	// set the slider height
-	var slider_height = (25 * (nheights - 1)) + 'px';
-	$('#height_slider2')[0].style.height = slider_height;
+	var slider_options = {
+	    layerArray: this.contours,
+	    position: 'bottomleft',
+	    orientation: 'vertical',
+	    dim: 1, // the height dimension in the layerArray
+	    labels: labels,
+	    title: 'Height AGL'
+	};
+	this.height_slider = L.control.arraySlider(slider_options);
+	this.height_slider.addTo(this._hysplit.map);
     }
 
     setup_sliders(map) {
