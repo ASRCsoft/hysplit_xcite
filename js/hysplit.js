@@ -796,6 +796,10 @@ class Hysplit {
 	};
 	legend.addTo(this.map);
     }
+
+    updateOrigin(lat, lon) {
+	this.origin_layer.getLayers()[0].setLatLng([lat, lon]);
+    }
     
     addSiteSelector() {
 	/* 'store' locator div */
@@ -1001,24 +1005,28 @@ class Hysplit {
 	    this.cur_name = name;
 	    this.cur_fwd = fwd;
 	    // get the site data
+	    var hysplit = this;
 	    var f = function() {
-		this.cur_site.remove();
-		this.cur_site = this.cached_sites[name][fwd];
-		this.cur_site.addTo(this.map);
+		hysplit.cur_site.remove();
+		hysplit.cur_site = hysplit.cached_sites[name][fwd];
+		hysplit.cur_site.addTo(hysplit.map);
 		// update the simulation info
-		this.update_info();
-	    }.bind(this);
+		hysplit.update_info();
+		var lat = this.data.latitude;
+		var lon = this.data.longitude;
+		hysplit.updateOrigin(lat, lon);
+	    };
 	    var f_fail = function() {
-		this.cur_site.remove();
-		this.cur_site = this.cached_sites[name][fwd];
+		hysplit.cur_site.remove();
+		hysplit.cur_site = hysplit.cached_sites[name][fwd];
 		// not adding anything to the map
-		this.update_info();
-	    }.bind(this);
+		hysplit.update_info();
+	    };
 	    if (!this.cached_sites[name][fwd]) {
 		var site;
 		site = new Site(name, fwd, this);
 		this.cached_sites[name][fwd] = site;
-		site.loadData().done(f).fail(f_fail);
+		site.loadData().done(f.bind(site)).fail(f_fail);
 	    } else {
 		f();
 	    }
