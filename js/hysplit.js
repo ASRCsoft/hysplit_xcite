@@ -281,7 +281,7 @@ L.Control.TimeDimension = L.Control.TimeDimension.extend({
 // and while I'm here...
 
 // an empty layer that turns things off and on
-L.ToggleLayer = L.LayerGroup.extend({
+L.ActionLayer = L.LayerGroup.extend({
     initialize: function(options) {
 	this.hysplit = options['hysplit'];
 	this.fwd = options['fwd'];
@@ -296,17 +296,22 @@ L.ToggleLayer = L.LayerGroup.extend({
     }
 });
 
-L.toggleLayer = function(options) {
-    return new L.ToggleLayer(options);
+L.actionLayer = function(options) {
+    return new L.ActionLayer(options);
 };
 
 
-class Site {
+// A layer containing the contours and trajectories for HYSPLIT and
+// coordinating them with the contour_layer and trajectory layers
+L.SiteLayer = L.LayerGroup.extend({
     // this object holds all of the site-specific objects
-    constructor(name, fwd, hysplit) {
-	this.name = name;
-	this.fwd = fwd;
-	this._hysplit = hysplit;
+    initialize: function(options) {
+	// will need to have: site name, fwd, date, hysplit
+	L.LayerGroup.prototype.initialize.call(this, []);
+	this.options = options;
+	this.name = this.options.name;
+	this.fwd = this.options.fwd;
+	this._hysplit = this.options.hysplit;
 	this.contour_layer = this._hysplit.contour_layer;
 	this.ens_trajectory_layer = this._hysplit.ens_trajectory_layer;
 	this.single_trajectory_layer = this._hysplit.single_trajectory_layer;
@@ -327,9 +332,8 @@ class Site {
 	this.height_slider;
 	this.timedim;
 	this.td_layer;
-    }
-
-    get folder() {
+    },
+    folder: function() {
 	// get the path to the metadata json for this site
 	var fwd_folder;
 	if (this.fwd) {
@@ -338,61 +342,52 @@ class Site {
 	    fwd_folder = 'bwd/';
 	}
 	return 'data/' + this.name + '/' + fwd_folder;
-    }
-
-    get meta_path() {
+    },
+    meta_path: function() {
 	// get the path to the metadata json for this site
-	return this.folder + 'meta.json';
-    }
-
-    contour_path(time, height) {
+	return this.folder() + 'meta.json';
+    },
+    contour_path: function(time, height) {
 	// get the path to the specified contour json file
-	return this.folder + 'height' + height + '_time' + time + '.json';
-    }
-
-    highlightFeature(e) {
+	return this.folder() + 'height' + height + '_time' + time + '.json';
+    },
+    highlightFeature: function(e) {
 	var contour = e.target;
 	var tooltip_options = {sticky: true};
 	var tooltip = L.tooltip(tooltip_options);
 	contour.bindTooltip(tooltip).openTooltip();
 	contour.setTooltipContent(contour.feature.properties.level_name);
-    }
-
-    resetHighlight(e) {
+    },
+    resetHighlight: function(e) {
 	// pm_layer.resetStyle(e.target);
 	// info.update();
-    }
-
-    zoomToFeature(e) {
+    },
+    zoomToFeature: function(e) {
 	map.fitBounds(e.target.getBounds());
-    }
-
-    onEachFeature(feature, layer) {
+    },
+    onEachFeature: function(feature, layer) {
 	var this2 = this;
 	layer.on({
 	    mouseover: this2.highlightFeature,
 	    mouseout: this2.resetHighlight,
 	    click: this2.zoomToFeature
 	});
-    }
-
-    ensTrajStyle(feature) {
+    },
+    ensTrajStyle: function(feature) {
   	return {
   	    weight: 3,
   	    opacity: .6,
   	    color: '#5075DB'
   	};
-    }
-
-    singleTrajStyle(feature) {
+    },
+    singleTrajStyle: function(feature) {
 	return {
 	    weight: 3,
 	    opacity: .6,
 	    color: '#FF0033'
 	};
-    }
-
-    resetTimedim() {
+    },
+    resetTimedim: function() {
 	if (!this._hysplit.timedim) {
 	    var start_time;
 	    if (this.fwd) {
@@ -406,9 +401,8 @@ class Site {
 	} else {
 	    this._hysplit.timedim.setAvailableTimes(this.times, 'replace');
 	}
-    }
-
-    loadData() {
+    },
+    loadData: function() {
 	// load the site's metadata, if needed
 	if (!!this.data) {
 	    // if the data is already loaded
@@ -416,35 +410,35 @@ class Site {
 	}
 	var this2 = this;
 	// return this so it can be used as a promise
-	return $.get(this.meta_path, function(json) {
-	    this2.data = json;
-	    this2.times = json['times'].map(function(text) {return new Date(text)});
-	    this2.heights = json['heights'];
+	return $.get(this.meta_path(), function(json) {
+	    this.data = json;
+	    this.times = json['times'].map(function(text) {return new Date(text)});
+	    this.heights = json['heights'];
 	    try {
 		// get the ensemble trajectories if they exist
 		var trajectories = json['trajectories'];
 		var ens_trajectory_layer = L.geoJSON(trajectories, {
-		    style: this2.ensTrajStyle,
+		    style: this.ensTrajStyle,
 		    onEachFeature: onEachTrajectory,
 		    smoothFactor: 1
 		});
-		var traj_options = {timeDimension: this2._hysplit.timedim,
-				    fwd: this2.fwd};
-		this2.trajectories = L.timeDimension.layer.geoJson2(ens_trajectory_layer, traj_options);
+		var traj_options = {timeDimension: this._hysplit.timedim,
+				    fwd: this.fwd};
+		this.trajectories = L.timeDimension.layer.geoJson2(ens_trajectory_layer, traj_options);
 	    } catch(err) {}
 	    try {
 		// get the trajectory if it exists
 		var trajectory = json['trajectory'];
 		var single_trajectory_layer = L.geoJSON(trajectory, {
-		    style: this2.singleTrajStyle,
+		    style: this.singleTrajStyle,
 		    onEachFeature: onEachTrajectory,
 		    smoothFactor: 1
 		});
-		var traj_options = {timeDimension: this2._hysplit.timedim,
-				    fwd: this2.fwd};
-		this2.trajectory = L.timeDimension.layer.geoJson2(single_trajectory_layer, traj_options);
+		var traj_options = {timeDimension: this._hysplit.timedim,
+				    fwd: this.fwd};
+		this.trajectory = L.timeDimension.layer.geoJson2(single_trajectory_layer, traj_options);
 	    } catch(err) {}
-	    var folder = this2.folder;
+	    var folder = this.folder();
 	    var makeLayer = function(ind, cache, arr_ind) {
 		if (ind.some(function(x) {return x < 0})) {
 		    throw "Negative index in makeLayer";
@@ -460,27 +454,27 @@ class Site {
 		    });
 		});
 	    }
-	    var ls_options = {values: [this2.times, this2.heights],
+	    var ls_options = {values: [this.times, this.heights],
 			      makeLayer: makeLayer};
-	    this2.contours = L.layerArray(ls_options);
-	    var td_options = {timeDimension: this2._hysplit.timedim};
-	    this2.td_layer = L.timeDimension.layer.layerArray(this2.contours, td_options);
-	});
-    }
-
-    displayData(time, height) {
+	    this.contours = L.layerArray(ls_options);
+	    var td_options = {timeDimension: this._hysplit.timedim};
+	    this.td_layer = L.timeDimension.layer.layerArray(this.contours, td_options);
+	}.bind(this));
+    },
+    displayData: function(time, height) {
 	this.contours.switchToIndex([time, parseInt(height)]);
 	this.time = time;
 	this.height = parseInt(height);
-    }
-
-    changeTime(time) {
+    },
+    changeTime: function(time) {
 	this.displayData(time, this.height);
-    }
-
-    changeHeight(e, ui) {
+    },
+    changeHeight: function(e, ui) {
 	var units;
 	var time = this.times.indexOf(this._hysplit.timedim.getCurrentTime());
+	if (time == -1) {
+	    throw 'Time not found in changeHeight function.'
+	}
 	var height_index = ui.value;
 	this.displayData(time, height_index);
 	var height = this.heights[height_index]; // the actual height value, in meters
@@ -490,9 +484,8 @@ class Site {
 	    units = 'ng/m<sup>2</sup>';
 	}
 	$.each($('._units_here'), function(i, x) {x.innerHTML = units});
-    };
-
-    makeHeightLabel(h) {
+    },
+    makeHeightLabel: function(h) {
 	var heights = this.heights;
     	if (heights[h] == 0) {
     	    return 'Deposition';
@@ -501,9 +494,8 @@ class Site {
     	} else {
     	    return heights[h - 1] + '-' + heights[h] + 'm';
     	}
-    }
-
-    createHeightSlider() {
+    },
+    createHeightSlider: function() {
 	// make a height slider using the contour layerArray
 
 	// put together some fancy labels first
@@ -522,30 +514,26 @@ class Site {
 	};
 	this.height_slider = L.control.arraySlider(slider_options);
 	this.height_slider.addTo(this._hysplit.map);
-    }
-
-    setup_sliders(map) {
+    },
+    setup_sliders: function(map) {
 	if (!this.height_slider) {
 	    this.createHeightSlider();
 	} else {
 	    this.height_slider.addTo(map);   
 	}
-    };
-
-    remove_sliders() {
+    },
+    remove_sliders: function() {
 	try {
 	    this.height_slider.remove();	    
 	} catch(err) {}
-    }
-
-    clearLayers() {
-	this.contour_layer.clearLayers();
-	this.ens_trajectory_layer.clearLayers();
-	this.single_trajectory_layer.clearLayers();
+    },
+    clearLayers: function() {
+	this.contour_layer.removeLayer(this.contours);
+	this.ens_trajectory_layer.removeLayer(this.trajectories);
+	this.single_trajectory_layer.removeLayer(this.trajectory);
 	this.td_layer.remove();
-    }
-
-    addTo(map) {
+    },
+    onAdd: function(map) {
 	this.loadData().done(function() {
 	    this.resetTimedim();
 	    this.setup_sliders(map);
@@ -554,15 +542,17 @@ class Site {
 	    this.single_trajectory_layer.addLayer(this.trajectory);
 	    this.td_layer.addTo(map);
 	}.bind(this));
-    }
-
-    remove() {
+    },
+    onRemove: function() {
 	this.remove_sliders();
-	try {
-	    this.clearLayers();   
-	} catch(err) {}
+	this.clearLayers();
     }
-}
+});
+
+L.siteLayer = function(options) {
+    return new L.SiteLayer(options);
+};
+
 
 class SiteSelector {
     constructor(sites, start_site_name, origin_layer, hysplit) {
@@ -638,7 +628,7 @@ class SiteSelector {
 	var marker = e.target;
 	this.select(marker);
 	var new_site = marker['site_name'];
-	var cur_fwd = this._hysplit.cur_site.fwd;
+	var cur_fwd = this._hysplit.cur_fwd;
 	this._hysplit.changeSite(new_site, cur_fwd);
     }
 
@@ -690,23 +680,32 @@ class SiteSelector {
 class Hysplit {
     constructor(sites_csv, start_site_name, start_site_fwd) {
 	this.sites_csv = sites_csv;
+	this.sites = this.get_sites();
 	this.contour_layer = L.layerGroup([]);
 	this.ens_trajectory_layer = L.layerGroup([]);
 	this.single_trajectory_layer = L.layerGroup([]);
 	this.origin_layer = L.layerGroup([]);
+	this.timedim = L.timeDimension({times: []});
+	// make two actionLayers (fwd and bck) to include in the layer controller
+	this.fwd_layer = L.actionLayer({hysplit: this, fwd: true});
+	this.bck_layer = L.actionLayer({hysplit: this, fwd: false});
 	this.cur_name = start_site_name;
 	this.cur_fwd = start_site_fwd;
-	this.cur_site = new Site(this.cur_name, this.cur_fwd, this);
+	// an multidimensional arrayLayer holding all of the site and
+	// fwd/bwd combinations
+	this.siteArray;
+	// var site_options = {name: start_site_name,
+	// 		    fwd: start_site_fwd,
+	// 		    hysplit: this};
+	// this.cur_site = L.siteLayer(site_options);
+	// this.cur_site = new Site(this.cur_name, this.cur_fwd, this);
 	this.map;
 	this.sites;
 	this.cached_sites = {};
 	this.site_map;
 	this.origin_circle;
-	this.timedim = L.timeDimension({times: []});
 	this.time_slider;
-	// make two toggleLayers (fwd and bck) to include in the layer controller
-	this.fwd_layer = L.toggleLayer({hysplit: this, fwd: true});
-	this.bck_layer = L.toggleLayer({hysplit: this, fwd: false});
+
     }
 
     get_sites() {
@@ -756,10 +755,11 @@ class Hysplit {
 		from, to;
 	    var legend_title = '<h4>Concentration</h4>';
 	    var units;
+	    // ignoring this for now:
 	    if (this2.cur_site.heights[this2.cur_site.height] == 0) {
-		units = 'ng/m<sup>2</sup>';
+	    	units = 'ng/m<sup>2</sup>';
 	    } else {
-		units = 'ng/m<sup>3</sup>';
+	    	units = 'ng/m<sup>3</sup>';
 	    }
 	    for (var i = grades.length - 1; i >= 0; i--) {
 		from = grades[i];
@@ -808,7 +808,7 @@ class Hysplit {
 	}).addTo(this.site_map);
 
 	// add markers?
-	var site_selector = new SiteSelector(this.sites, this.cur_site.name,
+	var site_selector = new SiteSelector(this.sites, this.cur_name,
 					     this.origin_layer, this);
 	site_selector.addTo(this.site_map);
     }
@@ -914,7 +914,7 @@ class Hysplit {
 		    // add the site id to the hysplit site cache
 		    hysplit.cached_sites[id] = {};
 		    hysplit.cached_sites[id][fwd_true] = null;
-		    hysplit.changeSite(id, fwd_true);
+		    hysplit.changeSite(id, fwd_true, true);
 		    hysplit.map.spin(false);
 		}.bind(this), 'json');
 	    });
@@ -984,8 +984,23 @@ class Hysplit {
 
     initialize(divid) {
 	return this.get_sites().done(function() {
-	    var site_name = this.cur_site.name;
-	    var site_fwd = this.cur_site.fwd;
+	    var site_name = this.cur_name;
+	    var site_fwd = this.cur_fwd;
+	    // get all the site names
+	    var site_names = this.sites.map(function(site) {return site['stid']});
+	    var fwd_values = [true, false];
+	    var makeSite = function(ind, cache, cache_ind) {
+		var site_options = {name: site_names[ind[0]],
+				    fwd: fwd_values[ind[1]],
+				    hysplit: this};
+		cache[cache_ind] = L.siteLayer(site_options);
+		return cache[cache_ind].loadData();
+	    }.bind(this);
+	    // the dimension values of the 2-dimensional siteArray
+	    var site_dim_values = [site_names, [true, false]];
+	    var siteArray_options = {values: site_dim_values,
+				     makeLayer: makeSite};
+	    this.siteArray = L.layerArray(siteArray_options);
 	    this.cached_sites[site_name][site_fwd] = this.cur_site;
 	    this.map = L.map(divid, {layers: [this.fwd_layer, this.contour_layer,
 					      this.ens_trajectory_layer,
@@ -996,11 +1011,11 @@ class Hysplit {
 	    this.origin_layer.addTo(this.map);
 	    this.addLayerControl();
 	    this.addTimeSlider();
-	    this.cur_site.loadData().done(function() {
-		this.cur_site.addTo(this.map);
+	    this.siteArray.addTo(this.map);
+	    this.changeSite(this.cur_name, this.cur_fwd).done(function() {
 		this.addLegend();
-		this.addSimInfo();
 	    }.bind(this));
+	    // this.siteArray.addValue([this.cur_name, this.cur_fwd]);
 	}.bind(this));
     }
 
@@ -1008,42 +1023,40 @@ class Hysplit {
 	this.sim_info.update();
     }
 
-    changeSite(name, fwd) {
-	if (this.cur_name != name || this.cur_fwd != fwd) {
+    changeSite(name, fwd, custom=false) {
+	if (custom) {
+	    var site_options = {name: site_names[ind[0]],
+				fwd: fwd_values[ind[1]],
+				hysplit: this};
+	    var results = L.siteLayer(site_options);
+	    results.loadData().done(function() {
+		// remove the current layer
+		this.siteArray.clearLayers();
+		this.cur_site = results;
+		if (this.sim_info) {
+		    this.update_info();
+		} else {
+		    this.addSimInfo();
+		}
+	    }.bind(this));
+	} else {
+	    // in case it's not currently displayed
+	    this.siteArray.addTo(this.map);
 	    this.cur_name = name;
 	    this.cur_fwd = fwd;
-	    // get the site data
-	    var hysplit = this;
-	    var f = function() {
-		hysplit.cur_site.remove();
-		hysplit.cur_site = hysplit.cached_sites[name][fwd];
-		hysplit.cur_site.addTo(hysplit.map);
-		// update the simulation info
-		hysplit.update_info();
-		var lat = this.data.latitude;
-		var lon = this.data.longitude;
-		hysplit.updateOrigin(lat, lon);
-	    };
-	    var f_fail = function() {
-		hysplit.cur_site.remove();
-		hysplit.cur_site = hysplit.cached_sites[name][fwd];
-		// not adding anything to the map
-		hysplit.update_info();
-	    };
-	    var site;
-	    if (!this.cached_sites[name][fwd]) {
-		site = new Site(name, fwd, this);
-		this.cached_sites[name][fwd] = site;
-		site.loadData().done(f.bind(site)).fail(f_fail);
-	    } else {
-		site = this.cached_sites[name][fwd];
-		f.bind(site)();
-	    }
+	    return this.siteArray.switchToValue([name, fwd]).done(function() {
+		this.cur_site = this.siteArray.cache[this.siteArray.valToArrayInd([name, fwd])];
+		if (this.sim_info) {
+		    this.update_info();   
+		} else {
+		    this.addSimInfo();
+		}
+	    }.bind(this)); 
 	}
     }
 
     changeFwd() {
-	var cur_fwd = this.cur_site.fwd;
-	this.changeSite(this.cur_site.name, !this.cur_site.fwd);
+	var cur_fwd = this.cur_fwd;
+	this.changeSite(this.cur_name, !this.cur_fwd);
     }
 }

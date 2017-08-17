@@ -50,7 +50,6 @@ L.LayerArray = L.LayerGroup.extend({
     },
     loadLayer: function(ind) {
 	var arr_ind = this.indToArrayInd(ind);
-	var arr_ind = this.indToArrayInd(ind);
 	if (!this.isLoaded[arr_ind]) {
 	    this.isLoaded[arr_ind] = true;
 	    return this.makeLayer(ind, this.cache, arr_ind);
@@ -74,7 +73,7 @@ L.LayerArray = L.LayerGroup.extend({
 	return ind;
     },
     addIndex: function(ind) {
-	this.loadLayer(ind).done(function() {
+	return this.loadLayer(ind).done(function() {
 	    this.addLayer(this.cache[this.indToArrayInd(ind)]);	    
 	}.bind(this));
     },
@@ -90,12 +89,12 @@ L.LayerArray = L.LayerGroup.extend({
     },
     switchToValue: function(val) {
 	var ind = this.getValueIndex(val);
-	this.switchToIndex(ind);
+	return this.switchToIndex(ind);
     },
     switchToIndex: function(ind) {
 	this.clearLayers();
-	this.addIndex(ind);
-	this.setIndex(ind);
+	return this.addIndex(ind);
+	// this.setIndex(ind);
     },
     switchDim: function(dim, ind) {
 	// make a copy of the current index
@@ -111,6 +110,9 @@ L.LayerArray = L.LayerGroup.extend({
     // and some special functions just for us
     switchTimeVal: function(t) {
 	var time_index = this.values[0].indexOf(t);
+	if (time_index == -1) {
+	    throw 'Time not found in switchTimeVal function.'
+	}
 	this.switchToIndex([time_index, this.height]);
     },
     switchHeight: function(h) {
@@ -118,6 +120,9 @@ L.LayerArray = L.LayerGroup.extend({
     },
     loadTime: function(t) {
 	var time_index = this.values[0].indexOf(t);
+	if (time_index == -1) {
+	    throw 'Time not found in loadTime function.'
+	}
 	return this.loadLayer([time_index, this.height]);
     },
     makeSlider: function(dim, orientation='vertical') {
@@ -127,8 +132,8 @@ L.LayerArray = L.LayerGroup.extend({
     }
 });
 
-L.layerArray = function(layers, options) {
-    return new L.LayerArray(layers, options);
+L.layerArray = function(options) {
+    return new L.LayerArray(options);
 };
 
 
@@ -215,12 +220,11 @@ L.TimeDimension.Layer.LayerArray = L.TimeDimension.Layer.extend({
 	// should probably be grabbing data here and firing event on
 	// completion (but this is good enough for now)
 	var time = ev.time;
-	var this2 = this;
 	this._baseLayer.loadTime(time).done(function() {
 	    this2.fire('timeload', {
 		time: time
             });
-	});
+	}.bind(this));
         return;
     },
 
