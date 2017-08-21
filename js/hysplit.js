@@ -291,7 +291,7 @@ L.ActionLayer = L.LayerGroup.extend({
 	// L.LayerGroup.prototype.addLayer.call(this);
 	var cur_fwd = this.hysplit.cur_fwd;
 	if (cur_fwd != this.fwd) {
-	    this.hysplit.changeSite(this.hysplit.cur_name, this.fwd);
+	    this.hysplit.changeSite(this.hysplit.cur_name, this.fwd, this.hysplit.cur_date);
 	}
     }
 });
@@ -311,6 +311,7 @@ L.SiteLayer = L.LayerGroup.extend({
 	this.options = options;
 	this.name = this.options.name;
 	this.fwd = this.options.fwd;
+	this.date = this.options.date;
 	this._hysplit = this.options.hysplit;
 	this.contour_layer = this._hysplit.contour_layer;
 	this.ens_trajectory_layer = this._hysplit.ens_trajectory_layer;
@@ -341,7 +342,8 @@ L.SiteLayer = L.LayerGroup.extend({
 	} else {
 	    fwd_folder = 'bwd/';
 	}
-	return 'data/' + this.name + '/' + fwd_folder;
+	return '/~xcite/hysplit_xcite/data/' + this.date + '_' +
+	    this.name + '/' + fwd_folder;
     },
     meta_path: function() {
 	// get the path to the metadata json for this site
@@ -502,8 +504,12 @@ L.SiteLayer = L.LayerGroup.extend({
 	var nheights = this.heights.length;
 	var labels = [];
 	for (i = 0; i < nheights; i++) {
-	    labels.push(this.makeHeightLabel(i))
+	    labels.push(this.makeHeightLabel(i));
 	}
+	// make sure this.contours has the current index so that the
+	// height slider knows what to switch to
+	// this.time = this.times.indexOf(this.timedim.getCurrentTime());
+	// this.contours.ind = [this.time, 0];
 	var slider_options = {
 	    layerArray: this.contours,
 	    position: 'bottomleft',
@@ -521,6 +527,10 @@ L.SiteLayer = L.LayerGroup.extend({
 	} else {
 	    this.height_slider.addTo(map);   
 	}
+    },
+    addContour: function() {
+	// var time = this._hysplit.timedim.getCurrentTime();
+	this.displayData(this.time, this.height);
     },
     remove_sliders: function() {
 	try {
@@ -541,6 +551,10 @@ L.SiteLayer = L.LayerGroup.extend({
 	    this.ens_trajectory_layer.addLayer(this.trajectories);
 	    this.single_trajectory_layer.addLayer(this.trajectory);
 	    this.td_layer.addTo(map);
+	    // first check to see if a contour has already been added
+	    if (!this.contours.ind) {
+		this.addContour();
+	    }
 	}.bind(this));
     },
     onRemove: function() {
@@ -551,6 +565,25 @@ L.SiteLayer = L.LayerGroup.extend({
 
 L.siteLayer = function(options) {
     return new L.SiteLayer(options);
+};
+
+// a siteLayer but with a slightly different path to work with custom
+// simulation results
+L.CustomSiteLayer = L.SiteLayer.extend({
+    folder: function() {
+	// get the path to the metadata json for this site
+	var fwd_folder;
+	if (this.fwd) {
+	    fwd_folder = 'fwd/';
+	} else {
+	    fwd_folder = 'bwd/';
+	}
+	return '/~xcite/hysplit_xcite/data/' + this.name + '/' + fwd_folder;
+    }
+});
+
+L.customSiteLayer = function(options) {
+    return new L.CustomSiteLayer(options);
 };
 
 
@@ -629,7 +662,8 @@ class SiteSelector {
 	this.select(marker);
 	var new_site = marker['site_name'];
 	var cur_fwd = this._hysplit.cur_fwd;
-	this._hysplit.changeSite(new_site, cur_fwd);
+	var cur_date = this._hysplit.cur_date;
+	this._hysplit.changeSite(new_site, cur_fwd, cur_date);
     }
 
     addSites(sites) {
@@ -678,7 +712,7 @@ class SiteSelector {
 
 
 class Hysplit {
-    constructor(sites_csv, start_site_name, start_site_fwd) {
+    constructor(sites_csv, start_site_name, start_site_fwd, start_site_date) {
 	this.sites_csv = sites_csv;
 	this.sites = this.get_sites();
 	this.contour_layer = L.layerGroup([]);
@@ -691,14 +725,11 @@ class Hysplit {
 	this.bck_layer = L.actionLayer({hysplit: this, fwd: false});
 	this.cur_name = start_site_name;
 	this.cur_fwd = start_site_fwd;
+	this.cur_date = start_site_date;
+	this.dates = ['20170818', '20170817', '20170816', '20170815', '20170814']
 	// an multidimensional arrayLayer holding all of the site and
 	// fwd/bwd combinations
 	this.siteArray;
-	// var site_options = {name: start_site_name,
-	// 		    fwd: start_site_fwd,
-	// 		    hysplit: this};
-	// this.cur_site = L.siteLayer(site_options);
-	// this.cur_site = new Site(this.cur_name, this.cur_fwd, this);
 	this.map;
 	this.sites;
 	this.cached_sites = {};
@@ -709,18 +740,10 @@ class Hysplit {
     }
 
     get_sites() {
-	var this2 = this;
-	var site_name;
 	return $.get(this.sites_csv, function(csv) {
-	    this2.sites = $.csv.toObjects(csv);
+	    this.sites = $.csv.toObjects(csv);
 	    // set up the cached sites object
-	    $.each(this2.sites, function(i, site) {
-		site_name = site['stid'];
-		this2.cached_sites[site_name] = {};
-		this2.cached_sites[site_name][true] = null;
-		this2.cached_sites[site_name][false] = null;
-	    });
-	});
+	}.bind(this));
     }
 
     addTileLayer() {
@@ -914,7 +937,7 @@ class Hysplit {
 		    // add the site id to the hysplit site cache
 		    hysplit.cached_sites[id] = {};
 		    hysplit.cached_sites[id][fwd_true] = null;
-		    hysplit.changeSite(id, fwd_true, true);
+		    hysplit.changeSite(id, fwd_true, '', true);
 		    hysplit.map.spin(false);
 		}.bind(this), 'json');
 	    });
@@ -982,6 +1005,33 @@ class Hysplit {
 	this.time_slider.addTo(this.map);
     }
 
+    addDateSelector() {
+	var hysplit = this;
+	var date_selector = L.control({position: 'bottomleft'});
+	date_selector.onAdd = function (map) { 
+	    this._div = L.DomUtil.create('div', 'info date_selector');
+	    // Disable clicking when user's cursor is on the info box
+	    // (because we need to keep the lat/lon from earlier mouse
+	    // clicks!)
+	    L.DomEvent.disableClickPropagation(this._div);
+	    var custom_form = '<div><form id="_date_selector" onSubmit="return false;">' +
+		'<select id="_new_date">';
+	    for (i=0; i < hysplit.dates.length; i++) {
+		custom_form += '<option value="' + hysplit.dates[i] + '">' +
+		    hysplit.dates[i] + '</option>';
+	    }
+	    custom_form += '</select><input type="submit" value="Update map"></form></div>';
+	    $(this._div).append('<h4>Release/Reception Date:</h4>' + custom_form);
+	    // and now the updating function
+	    $(this._div).find('#_date_selector').submit(function() {
+		var new_date = $('#_new_date').find(":selected").text();
+		hysplit.changeDate(new_date);
+	    });
+	    return this._div
+	}
+	date_selector.addTo(this.map);
+    }
+
     initialize(divid) {
 	return this.get_sites().done(function() {
 	    var site_name = this.cur_name;
@@ -989,19 +1039,21 @@ class Hysplit {
 	    // get all the site names
 	    var site_names = this.sites.map(function(site) {return site['stid']});
 	    var fwd_values = [true, false];
+	    var dates 
 	    var makeSite = function(ind, cache, cache_ind) {
 		var site_options = {name: site_names[ind[0]],
 				    fwd: fwd_values[ind[1]],
+				    date: this.dates[ind[2]],
 				    hysplit: this};
 		cache[cache_ind] = L.siteLayer(site_options);
 		return cache[cache_ind].loadData();
 	    }.bind(this);
 	    // the dimension values of the 2-dimensional siteArray
-	    var site_dim_values = [site_names, [true, false]];
+	    var site_dim_values = [site_names, [true, false], this.dates];
 	    var siteArray_options = {values: site_dim_values,
 				     makeLayer: makeSite};
 	    this.siteArray = L.layerArray(siteArray_options);
-	    this.cached_sites[site_name][site_fwd] = this.cur_site;
+	    // this.cached_sites[site_name][site_fwd] = this.cur_site;
 	    this.map = L.map(divid, {layers: [this.fwd_layer, this.contour_layer,
 					      this.ens_trajectory_layer,
 					      this.single_trajectory_layer]}).
@@ -1011,8 +1063,9 @@ class Hysplit {
 	    this.origin_layer.addTo(this.map);
 	    this.addLayerControl();
 	    this.addTimeSlider();
+	    this.addDateSelector();
 	    this.siteArray.addTo(this.map);
-	    this.changeSite(this.cur_name, this.cur_fwd).done(function() {
+	    this.changeSite(this.cur_name, this.cur_fwd, this.cur_date).done(function() {
 		this.addLegend();
 	    }.bind(this));
 	    // this.siteArray.addValue([this.cur_name, this.cur_fwd]);
@@ -1020,43 +1073,58 @@ class Hysplit {
     }
 
     update_info() {
-	this.sim_info.update();
+	if (this.sim_info) {
+	    this.sim_info.update();
+	} else {
+	    this.addSimInfo();
+	}
     }
 
-    changeSite(name, fwd, custom=false) {
+    changeSite(name, fwd, date, custom=false) {
+	// in case custom results are currently being shown
+	if (this.custom) {
+	    this.cur_site.remove();
+	    this.custom = false;
+	}
 	if (custom) {
-	    var site_options = {name: site_names[ind[0]],
-				fwd: fwd_values[ind[1]],
+	    // if custom, get the results manually
+	    var site_options = {name: name,
+				fwd: fwd,
+				date: date,
 				hysplit: this};
-	    var results = L.siteLayer(site_options);
+	    var results = L.customSiteLayer(site_options);
 	    results.loadData().done(function() {
 		// remove the current layer
 		this.siteArray.clearLayers();
 		this.cur_site = results;
-		if (this.sim_info) {
-		    this.update_info();
-		} else {
-		    this.addSimInfo();
-		}
+		this.cur_site.addTo(this.map);
+		this.cur_name = this.cur_site.name;
+		this.cur_fwd = this.cur_site.fwd;
+		this.updateOrigin(results.data['latitude'], results.data['longitude'])
+		this.custom = true;
+		this.update_info();
 	    }.bind(this));
 	} else {
 	    // in case it's not currently displayed
 	    this.siteArray.addTo(this.map);
 	    this.cur_name = name;
 	    this.cur_fwd = fwd;
-	    return this.siteArray.switchToValue([name, fwd]).done(function() {
-		this.cur_site = this.siteArray.cache[this.siteArray.valToArrayInd([name, fwd])];
-		if (this.sim_info) {
-		    this.update_info();   
-		} else {
-		    this.addSimInfo();
-		}
+	    this.cur_date = date;
+	    // let the siteArray do the switching
+	    var vals = [name, fwd, date];
+	    return this.siteArray.switchToValue(vals).done(function() {
+		this.cur_site = this.siteArray.cache[this.siteArray.valToArrayInd(vals)];
+		this.update_info();
 	    }.bind(this)); 
 	}
     }
 
     changeFwd() {
 	var cur_fwd = this.cur_fwd;
-	this.changeSite(this.cur_name, !this.cur_fwd);
+	this.changeSite(this.cur_name, !this.cur_fwd, this.cur_date);
+    }
+
+    changeDate(date) {
+	this.changeSite(this.cur_name, this.cur_fwd, date);
     }
 }

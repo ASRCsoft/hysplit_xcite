@@ -52,8 +52,12 @@ L.LayerArray = L.LayerGroup.extend({
 	var arr_ind = this.indToArrayInd(ind);
 	if (!this.isLoaded[arr_ind]) {
 	    this.isLoaded[arr_ind] = true;
+	    console.log('Ind:');
+	    console.log(ind);
 	    return this.makeLayer(ind, this.cache, arr_ind);
 	} else {
+	    console.log('Loaded Ind:');
+	    console.log(ind);
 	    return $.when();
 	}
     },
@@ -67,7 +71,7 @@ L.LayerArray = L.LayerGroup.extend({
 	for (i = 0; i < this.ndim; i++) {
 	    ind[i] = this.values[i].indexOf(val[i]);
 	    if (ind[i] == -1) {
-		throw 'Value ' + val[i] + 'not found in array dimension ' + i;
+		throw 'Value ' + val[i] + ' not found in array dimension ' + i;
 	    }
 	}
 	return ind;
@@ -93,14 +97,19 @@ L.LayerArray = L.LayerGroup.extend({
     },
     switchToIndex: function(ind) {
 	this.clearLayers();
+	this.setIndex(ind);
 	return this.addIndex(ind);
-	// this.setIndex(ind);
     },
     switchDim: function(dim, ind) {
 	// make a copy of the current index
 	var new_ind = [];
-	for (i=0; i<this.ind.length; i++) {
+	for (i=0; i<this.values.length; i++) {
 	    new_ind[i] = this.ind[i];
+	    // if (this.ind) {
+	    // 	new_ind[i] = this.ind[i];
+	    // } else {
+	    // 	new_ind[i] = 0;
+	    // }
 	}
 	// update it
 	new_ind[dim] = ind;
@@ -110,6 +119,10 @@ L.LayerArray = L.LayerGroup.extend({
     // and some special functions just for us
     switchTimeVal: function(t) {
 	var time_index = this.values[0].indexOf(t);
+	if (this.time == time_index) {
+	    // don't do anything
+	    return false;
+	}
 	if (time_index == -1) {
 	    throw 'Time not found in switchTimeVal function.'
 	}
@@ -221,7 +234,7 @@ L.TimeDimension.Layer.LayerArray = L.TimeDimension.Layer.extend({
 	// completion (but this is good enough for now)
 	var time = ev.time;
 	this._baseLayer.loadTime(time).done(function() {
-	    this2.fire('timeload', {
+	    this.fire('timeload', {
 		time: time
             });
 	}.bind(this));
@@ -239,8 +252,8 @@ L.TimeDimension.Layer.LayerArray = L.TimeDimension.Layer.extend({
 	var current_time = this._timeDimension.getCurrentTime();
 	if (this._currentLoadedTime != current_time) {
 	    this._currentLoadedTime = current_time;
-	    this._baseLayer.switchTimeVal(this._currentLoadedTime);
 	}
+	this._baseLayer.switchTimeVal(this._currentLoadedTime);
     }
 });
 
