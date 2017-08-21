@@ -76,17 +76,6 @@ onEachTrajectory = function(feature, layer) {
     });
 }
 
-var run_hysplit = function() {
-    var form = $("#hysplit");
-    var lat = form.find('input[name="lat"]').val();
-    var lon = form.find('input[name="lon"]').val();
-    // Send the data using post with element id name and name2
-    var url = 'http://appsvr.asrc.cestm.albany.edu:5000?lat=' + lat + '&lon=' + lon;
-    $.post(url, callback=function(text) {
-	form.append('<p>Flask says:<br>' + text + '</p>');
-    });
-};
-
 // helpful classes
 
 // extending the geojson time dimension layer to allow backward
@@ -342,7 +331,7 @@ L.SiteLayer = L.LayerGroup.extend({
 	} else {
 	    fwd_folder = 'bwd/';
 	}
-	return '/~xcite/hysplit_xcite/data/' + this.date + '_' +
+	return this._hysplit.hysplit_data_url + '/' + this.date + '_' +
 	    this.name + '/' + fwd_folder;
     },
     meta_path: function() {
@@ -710,7 +699,9 @@ SiteSelector.prototype.addTo = function addTo(map) {
 }
 
 
-function Hysplit(sites_csv, start_site_name, start_site_fwd, start_site_date) {
+function Hysplit(sites_csv, start_site_name, start_site_fwd, start_site_date, hysplit_data_url, hysplit_ondemand_url) {
+    this.hysplit_data_url = hysplit_data_url ? hysplit_data_url : 'http://appsvr.asrc.cestm.albany.edu/~xcite/hysplit_xcite/data';
+    this.hysplit_ondemand_url = hysplit_ondemand_url ? hysplit_ondemand_url : 'http://appsvr.asrc.cestm.albany.edu:5000';
     this.sites_csv = sites_csv;
     this.sites = this.get_sites();
     this.contour_layer = L.layerGroup([]);
