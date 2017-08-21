@@ -661,7 +661,8 @@ SiteSelector.prototype.clickMarker = function clickMarker(e) {
     this.select(marker);
     var new_site = marker['site_name'];
     var cur_fwd = this._hysplit.cur_site.fwd;
-    this._hysplit.changeSite(new_site, cur_fwd);
+    var cur_date = this._hysplit.cur_date;
+    this._hysplit.changeSite(new_site, cur_fwd, cur_date);
 }
 
 SiteSelector.prototype.addSites = function addSites(sites) {
