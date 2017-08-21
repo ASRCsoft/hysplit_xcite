@@ -593,7 +593,7 @@ function SiteSelector(sites, start_site_name, origin_layer, hysplit) {
     // the main map
     this.origin_layer = origin_layer;
     // the site markers
-    this.marker_layer = L.featureGroup();
+    this.marker_layer = L.layerGroup();
     this.start_site = start_site_name;
     this.site_info;
     this.selected;
@@ -814,10 +814,11 @@ Hysplit.prototype.addSiteSelector = function addSiteSelector() {
         site_div.id = 'locator';
         div.appendChild(site_div);
         $(div).accordion({
+	    // active: false,
             collapsible: true,
             heightStyle: "content"
         });
-        return div; 
+        return div;
 	
     };
     locator.addTo(this.map);
@@ -833,7 +834,7 @@ Hysplit.prototype.addSiteSelector = function addSiteSelector() {
     }).addTo(this.site_map);
 
     // add markers?
-    var site_selector = new SiteSelector(this.sites, this.cur_site.name,
+    var site_selector = new SiteSelector(this.sites, this.cur_name,
                                          this.origin_layer, this);
     site_selector.addTo(this.site_map);
 }
@@ -969,9 +970,9 @@ Hysplit.prototype.addSimInfo = function addSimInfo() {
         }
         $(this._div).prepend(info_text);
         $(this._div).accordion('refresh');
-        if (first_update) {
-            $(this._div).accordion("option", "active", 0);
-        }
+        // if (first_update) {
+        //     $(this._div).accordion("option", "active", 0);
+        // }
     };
     this.sim_info = sim_info.addTo(this.map);
     // set up the lat/lon action
