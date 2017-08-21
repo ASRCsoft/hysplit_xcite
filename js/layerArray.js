@@ -149,9 +149,9 @@ L.LayerArray = L.LayerGroup.extend({
 	}
 	return this.loadLayer([time_index, this.height]);
     },
-    makeSlider: function(dim, orientation='vertical') {
+    makeSlider: function(dim, orientation) {
 	var slider_options = {layerArray: this, dim: dim,
-			      orientation: orientation};
+			      orientation: orientation ? orientation : 'vertical'};
 	return L.control.arraySlider(slider_options);
     }
 });
