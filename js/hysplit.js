@@ -441,14 +441,14 @@ L.SiteLayer = L.LayerGroup.extend({
 		this.trajectory = L.timeDimension.layer.geoJson2(single_trajectory_layer, traj_options);
 	    } catch(err) {}
 	    var folder = this.folder();
-	    var makeLayer = function(ind, cache, arr_ind) {
+	    var makeLayer = function(ind) {
 		if (ind.some(function(x) {return x < 0})) {
 		    throw "Negative index in makeLayer";
 		}
 		var file = 'height' + ind[1] + '_time' + ind[0] + '.json';
 		var contour_path = folder + file;
-		return $.getJSON(contour_path, function(topojson) {
-		    cache[arr_ind] = L.topoJson(topojson, {
+		return $.getJSON(contour_path).then(function(topojson) {
+		    return L.topoJson(topojson, {
 			style: contourStyle,
 			onEachFeature: function(f, l) {onEachFeature(f, l)},
 			smoothFactor: .5,
@@ -1040,13 +1040,13 @@ class Hysplit {
 	    var site_names = this.sites.map(function(site) {return site['stid']});
 	    var fwd_values = [true, false];
 	    var dates 
-	    var makeSite = function(ind, cache, cache_ind) {
+	    var makeSite = function(ind) {
 		var site_options = {name: site_names[ind[0]],
 				    fwd: fwd_values[ind[1]],
 				    date: this.dates[ind[2]],
 				    hysplit: this};
-		cache[cache_ind] = L.siteLayer(site_options);
-		return cache[cache_ind].loadData();
+		var site = L.siteLayer(site_options);
+		return site.loadData().then(function() {return site});
 	    }.bind(this);
 	    // the dimension values of the 2-dimensional siteArray
 	    var site_dim_values = [site_names, [true, false], this.dates];

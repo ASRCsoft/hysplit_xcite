@@ -19,6 +19,8 @@ L.LayerArray = L.LayerGroup.extend({
 	// loaded data
 	this.isLoaded;
 	this.setupCache();
+	// this should be a function that takes an index array and
+	// returns a promise that resolves to the corresponding layer
 	if (options['makeLayer']) {
 	    this.makeLayer = options['makeLayer'];
 	}
@@ -30,6 +32,7 @@ L.LayerArray = L.LayerGroup.extend({
 	}
 	this.cache = new Array(arr_len);
 	this.isLoaded = new Array(arr_len);
+	this.promiseCache = new Array(arr_len);
     },
     indToArrayInd: function(ind) {
 	// get the 1D array index
@@ -48,13 +51,21 @@ L.LayerArray = L.LayerGroup.extend({
     valToArrayInd: function(val) {
 	return this.indToArrayInd(this.getValueIndex(val));
     },
+    addToCache: function(ind) {
+	var arr_ind = this.indToArrayInd(ind);
+	this.promiseCache[arr_ind] = this.makeLayer(ind);
+	var f = function(x) {
+	    this.cache[arr_ind] = x;
+	}.bind(this);
+	return this.promiseCache[arr_ind].then(f);
+    },
     loadLayer: function(ind) {
 	var arr_ind = this.indToArrayInd(ind);
 	if (!this.isLoaded[arr_ind]) {
 	    this.isLoaded[arr_ind] = true;
 	    console.log('Ind:');
 	    console.log(ind);
-	    return this.makeLayer(ind, this.cache, arr_ind);
+	    return this.addToCache(ind);
 	} else {
 	    console.log('Loaded Ind:');
 	    console.log(ind);
