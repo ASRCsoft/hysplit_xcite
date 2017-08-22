@@ -699,12 +699,10 @@ SiteSelector.prototype.addTo = function addTo(map) {
 }
 
 
-function Hysplit(sites, start_site_name, start_site_fwd, start_site_date, hysplit_data_url, hysplit_ondemand_url) {
+function Hysplit(start_site_name, start_site_fwd, hysplit_data_url, hysplit_ondemand_url) {
     this.hysplit_data_url = hysplit_data_url ? hysplit_data_url : 'http://appsvr.asrc.cestm.albany.edu/~xcite/hysplit_xcite/data';
     this.hysplit_ondemand_url = hysplit_ondemand_url ? hysplit_ondemand_url : 'http://appsvr.asrc.cestm.albany.edu:5000';
-    // this.sites_csv = sites_csv;
-    this.sites = sites;
-    // this.sites = this.get_sites();
+    // this.sites = sites;
     this.contour_layer = L.layerGroup([]);
     this.ens_trajectory_layer = L.layerGroup([]);
     this.single_trajectory_layer = L.layerGroup([]);
@@ -715,24 +713,8 @@ function Hysplit(sites, start_site_name, start_site_fwd, start_site_date, hyspli
     this.bck_layer = L.actionLayer({hysplit: this, fwd: false});
     this.cur_name = start_site_name;
     this.cur_fwd = start_site_fwd;
-    this.cur_date = start_site_date;
-    // generate available times, going backward from the given
-    // starting time
     this.dates = [];
-    // 12 hours' worth of milliseconds
-    var h12_milliseconds = 12 * 60 * 60 * 1000;
-    var tmp_date;
-    for (i=0; i<10; i++) {
-	tmp_date = new Date(start_site_date);
-	if (i % 2 == 1) {
-	    // every other time, subtract 12 hours
-	    tmp_date.setUTCHours(tmp_date.getUTCHours() - 12);
-	}
-	tmp_date.setUTCDate(tmp_date.getUTCDate() - Math.floor(i / 2));
-	console.log(tmp_date);	
-	this.dates.push(tmp_date);
-    }
-    // this.dates = ['20170818', '20170817', '20170816', '20170815', '20170814']
+    this.cur_date;
     // an multidimensional arrayLayer holding all of the site and
     // fwd/bwd combinations
     this.siteArray;
@@ -744,12 +726,21 @@ function Hysplit(sites, start_site_name, start_site_fwd, start_site_date, hyspli
     this.time_slider;
 }
 
-Hysplit.prototype.get_sites = function get_sites() {
-    return $.get(this.sites_csv, function(csv) {
-	this.sites = $.csv.toObjects(csv);
-	// set up the cached sites object
+Hysplit.prototype.getSites = function getSites() {
+    return $.getJSON('http://appsvr.asrc.cestm.albany.edu:5000/sites', function (json) {
+	this.sites = json;
     }.bind(this));
 }
+
+Hysplit.prototype.getTimes = function getTimes() {
+    return $.getJSON('http://appsvr.asrc.cestm.albany.edu:5000/times', function(json) {
+	this.time_json = json;
+	this.dates = this.time_json['data'].map(function(x) {return new Date(x[0])});
+	this.cur_date = this.dates[0];
+    }.bind(this));
+}
+
+
 
 Hysplit.prototype.addTileLayer = function addTileLayer() {
     L.tileLayer('https://api.tiles.mapbox.com/v4/{id}/{z}/{x}/{y}.png?access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw', {
@@ -1046,50 +1037,50 @@ Hysplit.prototype.addDateSelector = function addDateSelector() {
 }
 
 Hysplit.prototype.initialize = function initialize(divid) {
-    // return this.get_sites().done(function() {
-    var site_name = this.cur_name;
-    var site_fwd = this.cur_fwd;
-    // get all the site names
-    var site_names = this.sites.map(function(site) {return site['stid']});
-    var fwd_values = [true, false];
-    var dates;
-    var makeSite = function(ind) {
-	var date = this.dates[ind[2]];
-	console.log(date);
-	var date_str = date.getUTCFullYear() +
-	    ("00" + (date.getUTCMonth() + 1)).slice(-2) +
-	    ("00" + date.getUTCDate()).slice(-2) + '_' +
-	    ("00" + date.getUTCHours()).slice(-2) + 'z';
-	var site_options = {name: site_names[ind[0]],
-			    fwd: fwd_values[ind[1]],
-			    date: date_str,
-			    hysplit: this};
-	var site = L.siteLayer(site_options);
-	return site.loadData().then(function() {return site});
-    }.bind(this);
-    // the dimension values of the 2-dimensional siteArray
-    var site_dim_values = [site_names, [true, false], this.dates];
-    var siteArray_options = {values: site_dim_values,
-			     makeLayer: makeSite};
-    this.siteArray = L.layerArray(siteArray_options);
-    // this.cached_sites[site_name][site_fwd] = this.cur_site;
-    this.map = L.map(divid, {layers: [this.fwd_layer, this.contour_layer,
-				      this.ens_trajectory_layer,
-				      this.single_trajectory_layer]}).
-	setView([43, -74.5], 7);
-    this.addTileLayer();
-    this.addSiteSelector();
-    this.origin_layer.addTo(this.map);
-    this.addLayerControl();
-    this.addTimeSlider();
-    this.addDateSelector();
-    this.siteArray.addTo(this.map);
-    console.log(this.siteArray.values);
-    this.changeSite(this.cur_name, this.cur_fwd, this.cur_date).done(function() {
-	this.addLegend();
+    var ajax_sites = this.getSites();
+    var ajax_times = this.getTimes();
+    $.when(ajax_sites, ajax_times).done(function() {
+	var site_name = this.cur_name;
+	var site_fwd = this.cur_fwd;
+	// get all the site names
+	var site_names = this.sites.map(function(site) {return site['stid']});
+	var fwd_values = [true, false];
+	var dates;
+	var makeSite = function(ind) {
+	    var date = this.dates[ind[2]];
+	    console.log(date);
+	    var date_str = date.getUTCFullYear() +
+		("00" + (date.getUTCMonth() + 1)).slice(-2) +
+		("00" + date.getUTCDate()).slice(-2) + '_' +
+		("00" + date.getUTCHours()).slice(-2) + 'z';
+	    var site_options = {name: site_names[ind[0]],
+				fwd: fwd_values[ind[1]],
+				date: date_str,
+				hysplit: this};
+	    var site = L.siteLayer(site_options);
+	    return site.loadData().then(function() {return site});
+	}.bind(this);
+	// the dimension values of the 3-dimensional siteArray
+	var site_dim_values = [site_names, [true, false], this.dates];
+	var siteArray_options = {values: site_dim_values,
+				 makeLayer: makeSite};
+	this.siteArray = L.layerArray(siteArray_options);
+	this.map = L.map(divid, {layers: [this.fwd_layer, this.contour_layer,
+					  this.ens_trajectory_layer,
+					  this.single_trajectory_layer]}).
+	    setView([43, -74.5], 7);
+	this.addTileLayer();
+	this.addSiteSelector();
+	this.origin_layer.addTo(this.map);
+	this.addLayerControl();
+	this.addTimeSlider();
+	this.addDateSelector();
+	this.siteArray.addTo(this.map);
+	console.log(this.siteArray.values);
+	this.changeSite(this.cur_name, this.cur_fwd, this.cur_date).done(function() {
+	    this.addLegend();
+	}.bind(this));
     }.bind(this));
-	// this.siteArray.addValue([this.cur_name, this.cur_fwd]);
-    // }.bind(this));
 }
 
 Hysplit.prototype.update_info = function update_info() {
