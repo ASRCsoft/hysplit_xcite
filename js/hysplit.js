@@ -724,7 +724,23 @@ function Hysplit(sites_csv, start_site_name, start_site_fwd, start_site_date) {
     this.cur_name = start_site_name;
     this.cur_fwd = start_site_fwd;
     this.cur_date = start_site_date;
-    this.dates = ['20170818', '20170817', '20170816', '20170815', '20170814']
+    // generate available times, going backward from the given
+    // starting time
+    this.dates = [];
+    // 12 hours' worth of milliseconds
+    var h12_milliseconds = 12 * 60 * 60 * 1000;
+    var tmp_date;
+    for (i=0; i<10; i++) {
+	tmp_date = new Date(start_site_date);
+	if (i % 2 == 1) {
+	    // every other time, subtract 12 hours
+	    tmp_date.setUTCHours(tmp_date.getUTCHours() - 12);
+	}
+	tmp_date.setUTCDate(tmp_date.getUTCDate() - Math.floor(i / 2));
+	console.log(tmp_date);	
+	this.dates.push(tmp_date);
+    }
+    // this.dates = ['20170818', '20170817', '20170816', '20170815', '20170814']
     // an multidimensional arrayLayer holding all of the site and
     // fwd/bwd combinations
     this.siteArray;
@@ -825,7 +841,7 @@ Hysplit.prototype.addSiteSelector = function addSiteSelector() {
     };
     locator.addTo(this.map);
 
-    // add map and background 
+    // add map and background
 
     var site_map_options = {zoomControl: false,
                             attributionControl: false}; 
@@ -1022,7 +1038,7 @@ Hysplit.prototype.addDateSelector = function addDateSelector() {
 	    '<select id="_new_date">';
 	for (i=0; i < hysplit.dates.length; i++) {
 	    custom_form += '<option value="' + hysplit.dates[i] + '">' +
-		hysplit.dates[i] + '</option>';
+		hysplit.dates[i].toUTCString() + '</option>';
 	}
 	custom_form += '</select><input type="submit" value="Update map"></form></div>';
 	$(this._div).append('<h4>Release/Reception Date:</h4>' + custom_form);
@@ -1043,11 +1059,17 @@ Hysplit.prototype.initialize = function initialize(divid) {
 	// get all the site names
 	var site_names = this.sites.map(function(site) {return site['stid']});
 	var fwd_values = [true, false];
-	var dates 
+	var dates;
 	var makeSite = function(ind) {
+	    var date = this.dates[ind[2]];
+	    console.log(date);
+	    var date_str = date.getUTCFullYear() +
+		("00" + (date.getUTCMonth() + 1)).slice(-2) +
+		("00" + date.getUTCDate()).slice(-2) + '_' +
+		("00" + date.getUTCHours()).slice(-2) + 'z';
 	    var site_options = {name: site_names[ind[0]],
 				fwd: fwd_values[ind[1]],
-				date: this.dates[ind[2]],
+				date: date_str,
 				hysplit: this};
 	    var site = L.siteLayer(site_options);
 	    return site.loadData().then(function() {return site});
@@ -1069,6 +1091,7 @@ Hysplit.prototype.initialize = function initialize(divid) {
 	this.addTimeSlider();
 	this.addDateSelector();
 	this.siteArray.addTo(this.map);
+	console.log(this.siteArray.values);
 	this.changeSite(this.cur_name, this.cur_fwd, this.cur_date).done(function() {
 	    this.addLegend();
 	}.bind(this));
@@ -1116,10 +1139,15 @@ Hysplit.prototype.changeSite = function changeSite(name, fwd, date, custom=false
 	this.cur_date = date;
 	// let the siteArray do the switching
 	var vals = [name, fwd, date];
-	return this.siteArray.switchToValue(vals).done(function() {
-	    this.cur_site = this.siteArray.cache[this.siteArray.valToArrayInd(vals)];
+	// have to do this by index for now, ugh dumb
+	var name_ind = this.siteArray.values[0].indexOf(name);
+	var fwd_ind = this.siteArray.values[1].indexOf(fwd);
+	var date_ind = this.siteArray.values[2].map(Number).indexOf(+date);
+	var ind = [name_ind, fwd_ind, date_ind];
+	return this.siteArray.switchToIndex(ind).done(function() {
+	    this.cur_site = this.siteArray.cache[this.siteArray.indToArrayInd(ind)];
 	    this.update_info();
-	}.bind(this)); 
+	}.bind(this));
     }
 }
 

@@ -63,12 +63,8 @@ L.LayerArray = L.LayerGroup.extend({
 	var arr_ind = this.indToArrayInd(ind);
 	if (!this.isLoaded[arr_ind]) {
 	    this.isLoaded[arr_ind] = true;
-	    console.log('Ind:');
-	    console.log(ind);
 	    return this.addToCache(ind);
 	} else {
-	    console.log('Loaded Ind:');
-	    console.log(ind);
 	    return $.when();
 	}
     },
