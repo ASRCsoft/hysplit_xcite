@@ -657,8 +657,8 @@ SiteSelector.prototype.clickMarker = function clickMarker(e) {
 SiteSelector.prototype.addSites = function addSites(sites) {
     var this2 = this;
     $.each(sites, function(i, site) {
-        var lat = parseFloat(site['lat [degrees]']);
-        var lon = parseFloat(site['lon [degrees]']);
+        var lat = parseFloat(site['latitude']);
+        var lon = parseFloat(site['longitude']);
         var marker;
         marker = L.circleMarker([lat, lon]);
         this2.updateStyle(marker, this2.cm_options)
@@ -699,11 +699,12 @@ SiteSelector.prototype.addTo = function addTo(map) {
 }
 
 
-function Hysplit(sites_csv, start_site_name, start_site_fwd, start_site_date, hysplit_data_url, hysplit_ondemand_url) {
+function Hysplit(sites, start_site_name, start_site_fwd, start_site_date, hysplit_data_url, hysplit_ondemand_url) {
     this.hysplit_data_url = hysplit_data_url ? hysplit_data_url : 'http://appsvr.asrc.cestm.albany.edu/~xcite/hysplit_xcite/data';
     this.hysplit_ondemand_url = hysplit_ondemand_url ? hysplit_ondemand_url : 'http://appsvr.asrc.cestm.albany.edu:5000';
-    this.sites_csv = sites_csv;
-    this.sites = this.get_sites();
+    // this.sites_csv = sites_csv;
+    this.sites = sites;
+    // this.sites = this.get_sites();
     this.contour_layer = L.layerGroup([]);
     this.ens_trajectory_layer = L.layerGroup([]);
     this.single_trajectory_layer = L.layerGroup([]);
@@ -1045,50 +1046,50 @@ Hysplit.prototype.addDateSelector = function addDateSelector() {
 }
 
 Hysplit.prototype.initialize = function initialize(divid) {
-    return this.get_sites().done(function() {
-	var site_name = this.cur_name;
-	var site_fwd = this.cur_fwd;
-	// get all the site names
-	var site_names = this.sites.map(function(site) {return site['stid']});
-	var fwd_values = [true, false];
-	var dates;
-	var makeSite = function(ind) {
-	    var date = this.dates[ind[2]];
-	    console.log(date);
-	    var date_str = date.getUTCFullYear() +
-		("00" + (date.getUTCMonth() + 1)).slice(-2) +
-		("00" + date.getUTCDate()).slice(-2) + '_' +
-		("00" + date.getUTCHours()).slice(-2) + 'z';
-	    var site_options = {name: site_names[ind[0]],
-				fwd: fwd_values[ind[1]],
-				date: date_str,
-				hysplit: this};
-	    var site = L.siteLayer(site_options);
-	    return site.loadData().then(function() {return site});
-	}.bind(this);
-	// the dimension values of the 2-dimensional siteArray
-	var site_dim_values = [site_names, [true, false], this.dates];
-	var siteArray_options = {values: site_dim_values,
-				 makeLayer: makeSite};
-	this.siteArray = L.layerArray(siteArray_options);
-	// this.cached_sites[site_name][site_fwd] = this.cur_site;
-	this.map = L.map(divid, {layers: [this.fwd_layer, this.contour_layer,
-					  this.ens_trajectory_layer,
-					  this.single_trajectory_layer]}).
-	    setView([43, -74.5], 7);
-	this.addTileLayer();
-	this.addSiteSelector();
-	this.origin_layer.addTo(this.map);
-	this.addLayerControl();
-	this.addTimeSlider();
-	this.addDateSelector();
-	this.siteArray.addTo(this.map);
-	console.log(this.siteArray.values);
-	this.changeSite(this.cur_name, this.cur_fwd, this.cur_date).done(function() {
-	    this.addLegend();
-	}.bind(this));
-	// this.siteArray.addValue([this.cur_name, this.cur_fwd]);
+    // return this.get_sites().done(function() {
+    var site_name = this.cur_name;
+    var site_fwd = this.cur_fwd;
+    // get all the site names
+    var site_names = this.sites.map(function(site) {return site['stid']});
+    var fwd_values = [true, false];
+    var dates;
+    var makeSite = function(ind) {
+	var date = this.dates[ind[2]];
+	console.log(date);
+	var date_str = date.getUTCFullYear() +
+	    ("00" + (date.getUTCMonth() + 1)).slice(-2) +
+	    ("00" + date.getUTCDate()).slice(-2) + '_' +
+	    ("00" + date.getUTCHours()).slice(-2) + 'z';
+	var site_options = {name: site_names[ind[0]],
+			    fwd: fwd_values[ind[1]],
+			    date: date_str,
+			    hysplit: this};
+	var site = L.siteLayer(site_options);
+	return site.loadData().then(function() {return site});
+    }.bind(this);
+    // the dimension values of the 2-dimensional siteArray
+    var site_dim_values = [site_names, [true, false], this.dates];
+    var siteArray_options = {values: site_dim_values,
+			     makeLayer: makeSite};
+    this.siteArray = L.layerArray(siteArray_options);
+    // this.cached_sites[site_name][site_fwd] = this.cur_site;
+    this.map = L.map(divid, {layers: [this.fwd_layer, this.contour_layer,
+				      this.ens_trajectory_layer,
+				      this.single_trajectory_layer]}).
+	setView([43, -74.5], 7);
+    this.addTileLayer();
+    this.addSiteSelector();
+    this.origin_layer.addTo(this.map);
+    this.addLayerControl();
+    this.addTimeSlider();
+    this.addDateSelector();
+    this.siteArray.addTo(this.map);
+    console.log(this.siteArray.values);
+    this.changeSite(this.cur_name, this.cur_fwd, this.cur_date).done(function() {
+	this.addLegend();
     }.bind(this));
+	// this.siteArray.addValue([this.cur_name, this.cur_fwd]);
+    // }.bind(this));
 }
 
 Hysplit.prototype.update_info = function update_info() {

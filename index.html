@@ -10,7 +10,6 @@
 	<script src="https://unpkg.com/topojson@3"></script>
 	<!-- jquery stuff -->
 	<script src="https://code.jquery.com/jquery-3.2.1.min.js"></script>
-	<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-csv/0.8.3/jquery.csv.min.js"></script>
 	<!-- jquery ui stuff -->
 	<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
 	<link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
@@ -39,7 +38,7 @@
 	 /* contour levels */
 	 var levels = [-2, -1, 0, 1, 2, 3, 4, 5];
 	 var d1;
-	 jQuery.get('/~xcite/hysplit_xcite/data/current_date.txt', function(data) {
+	 $.get('/~xcite/hysplit_xcite/data/current_date.txt', function(data) {
 	     var date_str = data;
 	     var current_date = new Date();
 	     current_date.setUTCFullYear(parseInt(date_str.substring(0, 4)));
@@ -50,8 +49,10 @@
 	     current_date.setUTCSeconds(0);
 	     current_date.setUTCMilliseconds(0);
 	     /* d1 = current_date;*/
-	     h1 = new Hysplit('data/nysm.csv', 'VOOR', true, current_date);
-	     h1.initialize('map');
+	     $.getJSON('http://appsvr.asrc.cestm.albany.edu:5000/sites', function (sites) {
+		 h1 = new Hysplit(sites, 'VOOR', true, current_date);
+		 h1.initialize('map');
+	     })
 	 });
 	</script>
     </body>
