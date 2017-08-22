@@ -1031,10 +1031,11 @@ Hysplit.prototype.addDateSelector = function addDateSelector() {
 	    custom_form += '<option value="' + hysplit.dates[i] + '">' +
 		hysplit.dates[i].toUTCString() + '</option>';
 	}
-	custom_form += '</select><input type="submit" value="Update map"></form></div>';
+	// custom_form += '</select><input type="submit" value="Update map"></form></div>';
+	custom_form += '</select></form></div>';
 	$(this._div).append('<h4>Release/Reception Date:</h4>' + custom_form);
 	// and now the updating function
-	$(this._div).find('#_date_selector').submit(function() {
+	$(this._div).find('#_date_selector').change(function() {
 	    var new_date = new Date($('#_new_date').find(":selected").text());
 	    hysplit.changeDate(new_date);
 	});
@@ -1130,11 +1131,6 @@ Hysplit.prototype.changeSite = function changeSite(name, fwd, date, custom=false
 	this.cur_date = date;
 	// let the siteArray do the switching
 	var vals = [name, fwd, date];
-	// have to do this by index for now, ugh dumb
-	// var name_ind = this.siteArray.values[0].indexOf(name);
-	// var fwd_ind = this.siteArray.values[1].indexOf(fwd);
-	// var date_ind = this.siteArray.values[2].map(Number).indexOf(+date);
-	// var ind = [name_ind, fwd_ind, date_ind];
 	return this.siteArray.switchToValue(vals).done(function() {
 	    this.cur_site = this.siteArray.cache[this.siteArray.valToArrayInd(vals)];
 	    this.update_info();
