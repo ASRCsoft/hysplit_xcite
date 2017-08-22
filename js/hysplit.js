@@ -808,6 +808,7 @@ Hysplit.prototype.updateOrigin = function updateOrigin(lat, lon) {
 Hysplit.prototype.addSiteSelector = function addSiteSelector() {
     /* 'store' locator div */
     var locator = L.control({position: 'topright'});
+    var hysplit = this;
     locator.onAdd = function (map) {
         var div = L.DomUtil.create('div', 'info accordion');
         $(div).append('<h4>Current Site: <span id="cur_site">(None)</span></h4>');
@@ -815,12 +816,12 @@ Hysplit.prototype.addSiteSelector = function addSiteSelector() {
         site_div.id = 'locator';
         div.appendChild(site_div);
         $(div).accordion({
-	    // active: false,
+	    active: false,
             collapsible: true,
-            heightStyle: "content"
+            heightStyle: "content",
+	    activate: function() {hysplit.site_map.invalidateSize()}
         });
         return div;
-	
     };
     locator.addTo(this.map);
 
