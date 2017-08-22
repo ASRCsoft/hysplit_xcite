@@ -1044,7 +1044,7 @@ Hysplit.prototype.addDateSelector = function addDateSelector() {
 	$(this._div).append('<h4>Release/Reception Date:</h4>' + custom_form);
 	// and now the updating function
 	$(this._div).find('#_date_selector').submit(function() {
-	    var new_date = $('#_new_date').find(":selected").text();
+	    var new_date = new Date($('#_new_date').find(":selected").text());
 	    hysplit.changeDate(new_date);
 	});
 	return this._div
