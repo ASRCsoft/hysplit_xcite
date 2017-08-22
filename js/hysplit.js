@@ -1131,12 +1131,12 @@ Hysplit.prototype.changeSite = function changeSite(name, fwd, date, custom=false
 	// let the siteArray do the switching
 	var vals = [name, fwd, date];
 	// have to do this by index for now, ugh dumb
-	var name_ind = this.siteArray.values[0].indexOf(name);
-	var fwd_ind = this.siteArray.values[1].indexOf(fwd);
-	var date_ind = this.siteArray.values[2].map(Number).indexOf(+date);
-	var ind = [name_ind, fwd_ind, date_ind];
-	return this.siteArray.switchToIndex(ind).done(function() {
-	    this.cur_site = this.siteArray.cache[this.siteArray.indToArrayInd(ind)];
+	// var name_ind = this.siteArray.values[0].indexOf(name);
+	// var fwd_ind = this.siteArray.values[1].indexOf(fwd);
+	// var date_ind = this.siteArray.values[2].map(Number).indexOf(+date);
+	// var ind = [name_ind, fwd_ind, date_ind];
+	return this.siteArray.switchToValue(vals).done(function() {
+	    this.cur_site = this.siteArray.cache[this.siteArray.valToArrayInd(vals)];
 	    this.update_info();
 	}.bind(this));
     }

@@ -75,8 +75,17 @@ L.LayerArray = L.LayerGroup.extend({
     },
     getValueIndex: function(val) {
 	var ind = [];
+	var is_date;
 	for (i = 0; i < this.ndim; i++) {
-	    ind[i] = this.values[i].indexOf(val[i]);
+	    // check if the dimension is a date dimension
+	    is_date = this.values[i][0] instanceof Date;
+	    if (is_date) {
+		ind[i] = this.values[i].map(Number).indexOf(+val[i]);
+	    } else if (this.values[i][0] instanceof Object) {
+		throw "LayerArray can't get index of object values (except dates)";
+	    } else {
+		ind[i] = this.values[i].indexOf(val[i]);	
+	    }
 	    if (ind[i] == -1) {
 		throw 'Value ' + val[i] + ' not found in array dimension ' + i;
 	    }
@@ -112,11 +121,6 @@ L.LayerArray = L.LayerGroup.extend({
 	var new_ind = [];
 	for (i=0; i<this.values.length; i++) {
 	    new_ind[i] = this.ind[i];
-	    // if (this.ind) {
-	    // 	new_ind[i] = this.ind[i];
-	    // } else {
-	    // 	new_ind[i] = 0;
-	    // }
 	}
 	// update it
 	new_ind[dim] = ind;
