@@ -401,7 +401,14 @@ L.SiteLayer = L.LayerGroup.extend({
 	}
 	var this2 = this;
 	// return this so it can be used as a promise
-	return $.get(this.meta_path(), function(json) {
+	var metadata_url = 'http://appsvr.asrc.cestm.albany.edu:5000/metadata?site_id=' +
+	    this.options['site_id'] + '&time_id=' +
+	    this.options['time_id'] + '&fwd=' + this.fwd;
+	console.log(metadata_url);
+	// return $.get(this.meta_path(), function(json) {
+	return $.getJSON(metadata_url, function(results) {
+	    this.sim_id = results['id'];
+	    var json = results['metadata'];
 	    this.data = json;
 	    this.times = json['times'].map(function(text) {return new Date(text)});
 	    this.heights = json['heights'];
@@ -430,13 +437,17 @@ L.SiteLayer = L.LayerGroup.extend({
 		this.trajectory = L.timeDimension.layer.geoJson2(single_trajectory_layer, traj_options);
 	    } catch(err) {}
 	    var folder = this.folder();
-	    var makeLayer = function(ind) {
+	    var makeContours = function(ind) {
 		if (ind.some(function(x) {return x < 0})) {
 		    throw "Negative index in makeLayer";
 		}
 		var file = 'height' + ind[1] + '_time' + ind[0] + '.json';
 		var contour_path = folder + file;
-		return $.getJSON(contour_path).then(function(topojson) {
+		var contour_url = 'http://appsvr.asrc.cestm.albany.edu:5000/contours?sim_id=' +
+		    this.sim_id + '&height=' + ind[1] +
+		    '&time=' + ind[0];
+		// return $.getJSON(contour_path).then(function(topojson) {
+		return $.getJSON(contour_url).then(function(topojson) {
 		    return L.topoJson(topojson, {
 			style: contourStyle,
 			onEachFeature: function(f, l) {onEachFeature(f, l)},
@@ -444,9 +455,9 @@ L.SiteLayer = L.LayerGroup.extend({
 			file_path: contour_path
 		    });
 		});
-	    }
+	    }.bind(this);
 	    var ls_options = {values: [this.times, this.heights],
-			      makeLayer: makeLayer};
+			      makeLayer: makeContours};
 	    this.contours = L.layerArray(ls_options);
 	    var td_options = {timeDimension: this._hysplit.timedim};
 	    this.td_layer = L.timeDimension.layer.layerArray(this.contours, td_options);
@@ -1043,24 +1054,32 @@ Hysplit.prototype.initialize = function initialize(divid) {
 	var site_name = this.cur_name;
 	var site_fwd = this.cur_fwd;
 	// get all the site names
-	var site_names = this.sites.map(function(site) {return site['stid']});
 	var fwd_values = [true, false];
 	var dates;
 	var makeSite = function(ind) {
 	    var date = this.dates[ind[2]];
+	    var time_id = this.time_json['index'][ind[2]];
 	    console.log(date);
+	    console.log(time_id);
 	    var date_str = date.getUTCFullYear() +
 		("00" + (date.getUTCMonth() + 1)).slice(-2) +
 		("00" + date.getUTCDate()).slice(-2) + '_' +
 		("00" + date.getUTCHours()).slice(-2) + 'z';
-	    var site_options = {name: site_names[ind[0]],
+	    var site_name = this.sites[ind[0]]['stid'];
+	    var site_id = this.sites[ind[0]]['id'];
+	    console.log(site_name);
+	    console.log(site_id);
+	    var site_options = {name: site_name,
+				site_id: site_id,
 				fwd: fwd_values[ind[1]],
 				date: date_str,
+				time_id: time_id,
 				hysplit: this};
 	    var site = L.siteLayer(site_options);
 	    return site.loadData().then(function() {return site});
 	}.bind(this);
 	// the dimension values of the 3-dimensional siteArray
+	var site_names = this.sites.map(function(x) {return x['stid']})
 	var site_dim_values = [site_names, [true, false], this.dates];
 	var siteArray_options = {values: site_dim_values,
 				 makeLayer: makeSite};
