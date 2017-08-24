@@ -62,19 +62,26 @@ sub {
 }
 
 /* slider stuff */
+/* common settings */
+.ui-slider-pips {
+    margin: 10px;
+}
+.slider-axis .ui-slider-pips .ui-slider-label,
+.slider-axis .ui-slider-pips .ui-slider-label {
+    color: black;
+}
 .ui-slider-vertical.ui-slider-pips .ui-slider-label {
     width: max-content;
-    color: black;
     margin-left: -5px;
 }
 .ui-slider-vertical {
     height: 35px;    
 }
-.vertical-axis.info {
+.slider-axis.info {
     background: none;
     box-shadow: none;
 }
-.vertical-axis h4 {
+.slider-axis h4 {
     color: #111;
     margin-bottom: 15px;
 }

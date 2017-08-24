@@ -13,8 +13,6 @@ L.LayerArray = L.LayerGroup.extend({
 	this.dims = this.values.map(function(x) {return x.length});
 	this.ndim = this.dims.length;
 	this.ind;
-	this.time = 0;
-	this.height = 0;
 	// and array of boolean values to keep from loading previously
 	// loaded data
 	this.isLoaded;
@@ -70,8 +68,6 @@ L.LayerArray = L.LayerGroup.extend({
     },
     setIndex: function(ind) {
 	this.ind = ind;
-	this.time = ind[0];
-	this.height = ind[1];
     },
     getValueIndex: function(val) {
 	var ind = [];
@@ -127,28 +123,6 @@ L.LayerArray = L.LayerGroup.extend({
 	// switch to it
 	this.switchToIndex(new_ind);
     },
-    // and some special functions just for us
-    switchTimeVal: function(t) {
-	var time_index = this.values[0].indexOf(t);
-	if (this.time == time_index) {
-	    // don't do anything
-	    return false;
-	}
-	if (time_index == -1) {
-	    throw 'Time not found in switchTimeVal function.'
-	}
-	this.switchToIndex([time_index, this.height]);
-    },
-    switchHeight: function(h) {
-	this.switchToIndex([this.time, h]);
-    },
-    loadTime: function(t) {
-	var time_index = this.values[0].indexOf(t);
-	if (time_index == -1) {
-	    throw 'Time not found in loadTime function.'
-	}
-	return this.loadLayer([time_index, this.height]);
-    },
     makeSlider: function(dim, orientation) {
 	var slider_options = {layerArray: this, dim: dim,
 			      orientation: orientation ? orientation : 'vertical'};
@@ -166,13 +140,19 @@ L.Control.ArraySlider = L.Control.extend({
     // this is going to have the dimension number and layerarray object
     onAdd: function() {
 	var layerArray = this.options.layerArray;
-	var dim = this.options.dim;
-	var labels = this.options.labels ? this.options.labels : layerArray.values[dim];
+	var dim = this.options.dim || 0;
+	var labels = this.options.labels || layerArray.values[dim];
 	var dim_length = labels.length;
-	var orientation = this.options.orientation;
-	var title = this.options.title ? this.options.title : '';
+	var orientation = this.options.orientation || 'horizontal';
+	var is_vertical = orientation == 'vertical';
+	var title = this.options.title || '';
+	var slider_length = this.options.length || (25 * (dim_length - 1)) + 'px';
 	// set up the div if it isn't there already
-	this._div = L.DomUtil.create('div', 'info vertical-axis');
+	if (is_vertical) {
+	    this._div = L.DomUtil.create('div', 'info slider-axis vertical-axis');
+	} else {
+	    this._div = L.DomUtil.create('div', 'info slider-axis');
+	}
 	// var grades = levels,
 	//     labels = [];
 	var range_title = '<h4>' + title + '</h4>'
@@ -190,9 +170,13 @@ L.Control.ArraySlider = L.Control.extend({
 	// get the slider labels
 	var pip_options = {rest: 'label', labels: labels};
 	$(slider).slider(slider_options).slider("pips", pip_options);
-	// set the slider height
-	var slider_height = (25 * (dim_length - 1)) + 'px';
-	$(slider)[0].style.height = slider_height;
+	if (is_vertical) {
+	    // set the slider height
+	    $(slider)[0].style.height = slider_length;
+	} else {
+	    // set the slider width
+	    $(slider)[0].style.width = slider_length;
+	}
 
 	// Disable dragging when user's cursor enters the element
 	// courtesy of https://gis.stackexchange.com/a/104609

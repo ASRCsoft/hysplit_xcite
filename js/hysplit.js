@@ -460,7 +460,7 @@ L.SiteLayer = L.LayerGroup.extend({
 	    }.bind(this);
 	    var ls_options = {values: [this.times, this.heights],
 			      makeLayer: makeContours};
-	    this.contours = L.layerArray(ls_options);
+	    this.contours = L.contourArray(ls_options);
 	    var td_options = {timeDimension: this._hysplit.timedim};
 	    this.td_layer = L.timeDimension.layer.layerArray(this.contours, td_options);
 	}.bind(this));
@@ -516,9 +516,11 @@ L.SiteLayer = L.LayerGroup.extend({
 	    layerArray: this.contours,
 	    position: 'bottomleft',
 	    orientation: 'vertical',
+	    // orientation: 'horizontal',
 	    dim: 1, // the height dimension in the layerArray
 	    labels: labels,
-	    title: 'Height AGL'
+	    title: 'Height AGL',
+	    // length: '50px'
 	};
 	this.height_slider = L.control.arraySlider(slider_options);
 	this.height_slider.addTo(this._hysplit.map);
@@ -591,6 +593,45 @@ L.CustomSiteLayer = L.SiteLayer.extend({
 
 L.customSiteLayer = function(options) {
     return new L.CustomSiteLayer(options);
+};
+
+L.ContourArray = L.LayerArray.extend({
+    // some special layerArray functions just for us
+    initialize: function(options) {
+	L.LayerArray.prototype.initialize.call(this, options);
+	this.time = 0;
+	this.height = 0;
+    },
+    setIndex: function(ind) {
+	this.ind = ind;
+	this.time = ind[0];
+	this.height = ind[1];
+    },
+    switchTimeVal: function(t) {
+	var time_index = this.values[0].indexOf(t);
+	if (this.time == time_index) {
+	    // don't do anything
+	    return false;
+	}
+	if (time_index == -1) {
+	    throw 'Time not found in switchTimeVal function.'
+	}
+	this.switchToIndex([time_index, this.height]);
+    },
+    switchHeight: function(h) {
+	this.switchToIndex([this.time, h]);
+    },
+    loadTime: function(t) {
+	var time_index = this.values[0].indexOf(t);
+	if (time_index == -1) {
+	    throw 'Time not found in loadTime function.'
+	}
+	return this.loadLayer([time_index, this.height]);
+    },
+});
+
+L.contourArray = function(options) {
+    return new L.ContourArray(options);
 };
 
 
@@ -934,9 +975,9 @@ Hysplit.prototype.addSimInfo = function addSimInfo() {
             // var url = hysplit.hysplit_ondemand_url + '?' + $(this).serialize();
 	    // get the id of the time
 	    var time_index = hysplit.dates.map(Number).indexOf(+hysplit.cur_date);
-	    console.log(hysplit.dates);
-	    console.log(hysplit.cur_date);
-	    console.log(time_index);
+	    // console.log(hysplit.dates);
+	    // console.log(hysplit.cur_date);
+	    // console.log(time_index);
 	    var time_id = hysplit.time_json['index'][time_index];
 	    var url = 'http://appsvr.asrc.cestm.albany.edu:5000/hysplit2?' +
 		$(this).serialize() + '&time_id=' + time_id;
@@ -1077,16 +1118,16 @@ Hysplit.prototype.initialize = function initialize(divid) {
 	var makeSite = function(ind) {
 	    var date = this.dates[ind[2]];
 	    var time_id = this.time_json['index'][ind[2]];
-	    console.log(date);
-	    console.log(time_id);
+	    // console.log(date);
+	    // console.log(time_id);
 	    var date_str = date.getUTCFullYear() +
 		("00" + (date.getUTCMonth() + 1)).slice(-2) +
 		("00" + date.getUTCDate()).slice(-2) + '_' +
 		("00" + date.getUTCHours()).slice(-2) + 'z';
 	    var site_name = this.sites[ind[0]]['stid'];
 	    var site_id = this.sites[ind[0]]['id'];
-	    console.log(site_name);
-	    console.log(site_id);
+	    // console.log(site_name);
+	    // console.log(site_id);
 	    var site_options = {name: site_name,
 				site_id: site_id,
 				fwd: fwd_values[ind[1]],
@@ -1113,7 +1154,7 @@ Hysplit.prototype.initialize = function initialize(divid) {
 	this.addTimeSlider();
 	this.addDateSelector();
 	this.siteArray.addTo(this.map);
-	console.log(this.siteArray.values);
+	// console.log(this.siteArray.values);
 	this.changeSite(this.cur_name, this.cur_fwd, this.cur_date).done(function() {
 	    this.addLegend();
 	}.bind(this));
