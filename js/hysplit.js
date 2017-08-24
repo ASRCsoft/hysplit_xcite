@@ -280,7 +280,8 @@ L.ActionLayer = L.LayerGroup.extend({
 	// L.LayerGroup.prototype.addLayer.call(this);
 	var cur_fwd = this.hysplit.cur_fwd;
 	if (cur_fwd != this.fwd) {
-	    this.hysplit.changeSite(this.hysplit.cur_name, this.fwd, this.hysplit.cur_date);
+	    this.hysplit.changeFwd();
+	    // this.hysplit.changeSite(this.hysplit.cur_name, this.fwd, this.hysplit.cur_date);
 	}
     }
 });
@@ -337,6 +338,12 @@ L.SiteLayer = L.LayerGroup.extend({
     meta_path: function() {
 	// get the path to the metadata json for this site
 	return this.folder() + 'meta.json';
+    },
+    meta_url: function() {
+	// get the url for the metadata json for this site
+	return 'http://appsvr.asrc.cestm.albany.edu:5000/metadata?site_id=' +
+	    this.options['site_id'] + '&time_id=' +
+	    this.options['time_id'] + '&fwd=' + this.fwd;
     },
     contour_path: function(time, height) {
 	// get the path to the specified contour json file
@@ -401,12 +408,7 @@ L.SiteLayer = L.LayerGroup.extend({
 	}
 	var this2 = this;
 	// return this so it can be used as a promise
-	var metadata_url = 'http://appsvr.asrc.cestm.albany.edu:5000/metadata?site_id=' +
-	    this.options['site_id'] + '&time_id=' +
-	    this.options['time_id'] + '&fwd=' + this.fwd;
-	console.log(metadata_url);
-	// return $.get(this.meta_path(), function(json) {
-	return $.getJSON(metadata_url, function(results) {
+	return $.getJSON(this.meta_url(), function(results) {
 	    this.sim_id = results['id'];
 	    var json = results['metadata'];
 	    this.data = json;
@@ -570,6 +572,11 @@ L.siteLayer = function(options) {
 // a siteLayer but with a slightly different path to work with custom
 // simulation results
 L.CustomSiteLayer = L.SiteLayer.extend({
+    meta_url: function() {
+	// get the url for the metadata json for this site
+	return 'http://appsvr.asrc.cestm.albany.edu:5000/metadata?sim_id=' +
+	    this.options['sim_id'];
+    },
     folder: function() {
 	// get the path to the metadata json for this site
 	var fwd_folder;
@@ -729,6 +736,8 @@ function Hysplit(start_site_name, start_site_fwd, hysplit_data_url, hysplit_onde
     // an multidimensional arrayLayer holding all of the site and
     // fwd/bwd combinations
     this.siteArray;
+    // custom simulation ids
+    this.custom_id = {};
     this.map;
     this.sites;
     this.cached_sites = {};
@@ -922,7 +931,15 @@ Hysplit.prototype.addSimInfo = function addSimInfo() {
                 $('#hysplit_message').text("Error: Height must be between 0 and 200.");
                 return false;
             }
-            var url = hysplit.hysplit_ondemand_url + '?' + $(this).serialize();
+            // var url = hysplit.hysplit_ondemand_url + '?' + $(this).serialize();
+	    // get the id of the time
+	    var time_index = hysplit.dates.map(Number).indexOf(+hysplit.cur_date);
+	    console.log(hysplit.dates);
+	    console.log(hysplit.cur_date);
+	    console.log(time_index);
+	    var time_id = hysplit.time_json['index'][time_index];
+	    var url = 'http://appsvr.asrc.cestm.albany.edu:5000/hysplit2?' +
+		$(this).serialize() + '&time_id=' + time_id;
 
             $('#hysplit_message').text('Running HYSPLIT...');
             hysplit.map.spin(true, {scale: 2.5});
@@ -938,6 +955,7 @@ Hysplit.prototype.addSimInfo = function addSimInfo() {
                 $('#hysplit_message')[0].innerHTML +=
                     '<br>Simulations took ' + data['seconds'] + ' seconds.';
                 // get the path to the simulation results
+		hysplit.custom_id = data;
                 var id = data['id'];
                 var fwd_str;
                 if (fwd_true) {
@@ -951,7 +969,7 @@ Hysplit.prototype.addSimInfo = function addSimInfo() {
                 // add the site id to the hysplit site cache
                 hysplit.cached_sites[id] = {};
                 hysplit.cached_sites[id][fwd_true] = null;
-                hysplit.changeSite(id, fwd_true);
+                hysplit.changeSite('Custom', fwd_true, hysplit.cur_date, true);
                 hysplit.map.spin(false);
             }.bind(this), 'json');
         });
@@ -1118,7 +1136,9 @@ Hysplit.prototype.changeSite = function changeSite(name, fwd, date, custom=false
     }
     if (custom) {
 	// if custom, get the results manually
-	var site_options = {name: name,
+	var fwd_str = fwd ? 'fwd' : 'bwd';
+	var site_options = {name: 'Custom',
+			    sim_id: this.custom_id[fwd_str],
 			    fwd: fwd,
 			    date: date,
 			    hysplit: this};
@@ -1151,7 +1171,11 @@ Hysplit.prototype.changeSite = function changeSite(name, fwd, date, custom=false
 
 Hysplit.prototype.changeFwd = function changeFwd() {
     var cur_fwd = this.cur_fwd;
-    this.changeSite(this.cur_name, !this.cur_fwd, this.cur_date);
+    // if (this.custom) {
+    this.changeSite(this.cur_name, !this.cur_fwd, this.cur_date, this.custom);
+    // } else {
+    // 	this.changeSite(this.cur_name, !this.cur_fwd, this.cur_date);	
+    // }
 }
 
 Hysplit.prototype.changeDate = function changeDate(date) {
