@@ -80,9 +80,6 @@ highlightTrajectory = function(e) {
     }
     var text = 'Trajectory ' + startend + ' at ' + tstart;
     var div = document.createElement('div');
-    // add a div so the tooltip is long enough for the time series
-    // graph
-    $(div).append('<div style="width:500px"></div>');
     trajectory.bindTooltip(tooltip).setTooltipContent(div).openTooltip();
 }
 

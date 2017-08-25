@@ -70,3 +70,9 @@ sub {
 #locator {
     overflow: hidden;
 }
+
+/* for the metricsgraphics trajectory graph */
+.hysplit_trajectory_tooltip {
+    width: 500px;
+    height: 200px;
+}
