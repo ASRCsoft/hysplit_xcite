@@ -46,7 +46,7 @@ addHeightGraph = function(e) {
         // description: "This is a simple line chart. You can remove the area portion by adding area: false to the arguments list.",
         data: data,
 	interpolate: d3.curveLinear,
-        width: 600,
+        width: 500,
         height: 200,
 	left: 90,
         right: 20,
@@ -82,7 +82,7 @@ highlightTrajectory = function(e) {
     var div = document.createElement('div');
     // add a div so the tooltip is long enough for the time series
     // graph
-    $(div).append('<div style="width:600px"></div>');
+    $(div).append('<div style="width:500px"></div>');
     trajectory.bindTooltip(tooltip).setTooltipContent(div).openTooltip();
 }
 
@@ -432,7 +432,18 @@ L.SiteLayer = L.LayerGroup.extend({
 				   currentTime: start_time};
 	    this._hysplit.timedim = L.timeDimension(timedim_options);
 	} else {
-	    this._hysplit.timedim.setAvailableTimes(this.times, 'replace');
+	    // this is a bit weird-- when changing the date, also want
+	    // to change the time to match the current hours from
+	    // release
+	    var hysplit = this._hysplit;
+	    if (hysplit.cur_site) {
+		var cur_hours = hysplit.cur_site.contours.time || 0;
+		console.log(cur_hours);
+		hysplit.timedim.setAvailableTimes(this.times, 'replace');
+		hysplit.timedim.setCurrentTime(this.times[cur_hours]);
+	    } else {
+		hysplit.timedim.setAvailableTimes(this.times, 'replace');
+	    }
 	}
     },
     loadData: function() {
@@ -585,6 +596,7 @@ L.SiteLayer = L.LayerGroup.extend({
     onAdd: function(map) {
 	this.loadData().done(function() {
 	    this.resetTimedim();
+	    // now back to the normal stuff
 	    this.setup_sliders(map);
 	    this.contour_layer.addLayer(this.contours);
 	    this.ens_trajectory_layer.addLayer(this.trajectories);
@@ -1253,5 +1265,5 @@ Hysplit.prototype.changeFwd = function changeFwd() {
 }
 
 Hysplit.prototype.changeDate = function changeDate(date) {
-    this.changeSite(this.cur_name, this.cur_fwd, date);
+    this.changeSite(this.cur_name, this.cur_fwd, date)
 }
