@@ -51,6 +51,7 @@ addHeightGraph = function(e) {
 	left: 90,
         right: 20,
 	area: false,
+	utc_time: true,
         target: tooltip._content,
         x_accessor: 'time',
         y_accessor: 'height',
