@@ -30,10 +30,42 @@ highlightFeature = function(e) {
     contour.setTooltipContent(contour.feature.properties.level_name);
 }
 
+addHeightGraph = function(e) {
+    var times = this.feature.properties.times;
+    var heights = this.feature.properties.heights;
+    // var tooltip = e.tooltip;
+    var tooltip = this.getTooltip();
+    // make the time series list for metricsgraphics
+    var data = [];
+    for (var i=0; i<times.length; i++) {
+	data.push({'time': new Date(times[i]), 'height': heights[i]});
+    }
+    // console.log(data);
+    MG.data_graphic({
+        title: "Trajectory Height",
+        // description: "This is a simple line chart. You can remove the area portion by adding area: false to the arguments list.",
+        data: data,
+	interpolate: d3.curveLinear,
+        width: 600,
+        height: 200,
+	left: 90,
+        right: 20,
+	area: false,
+        target: tooltip._content,
+        x_accessor: 'time',
+        y_accessor: 'height',
+	x_label: 'Time',
+        y_label: 'Height (m)',
+    });
+}
+
 highlightTrajectory = function(e) {
     var trajectory = e.target;
-    var tooltip = L.tooltip();
-    trajectory.bindTooltip(tooltip).openTooltip();
+    var tooltip_options = {className: 'hysplit_trajectory_tooltip'}
+    var tooltip = L.tooltip(tooltip_options);
+    // create the height graph when added to map:
+    // tooltip.onAdd = addHeightGraph.bind(trajectory);
+    trajectory.on('tooltipopen', addHeightGraph.bind(trajectory));
     // see if this trajectory is forward or backward
     var ncoords = trajectory.feature.properties.times.length;
     var tstart = new Date(trajectory.feature.properties.times[0]);
@@ -46,7 +78,11 @@ highlightTrajectory = function(e) {
 	startend = 'ending';
     }
     var text = 'Trajectory ' + startend + ' at ' + tstart;
-    trajectory.setTooltipContent(text);
+    var div = document.createElement('div');
+    // add a div so the tooltip is long enough for the time series
+    // graph
+    $(div).append('<div style="width:600px"></div>');
+    trajectory.bindTooltip(tooltip).setTooltipContent(div).openTooltip();
 }
 
 resetHighlight = function(e) {
