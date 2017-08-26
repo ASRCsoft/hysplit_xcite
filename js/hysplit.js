@@ -55,8 +55,8 @@ addHeightGraph = function(e) {
         target: tooltip._content,
         x_accessor: 'time',
         y_accessor: 'height',
-	x_label: 'Time',
-        y_label: 'Height (m)',
+	x_label: 'Time (UTC)',
+        y_label: 'Height AGL (m)',
     });
 }
 
@@ -295,32 +295,6 @@ L.Control.TimeDimension = L.Control.TimeDimension.extend({
 	    date.toLocaleString();
     }
 });
-
-
-
-
-// and while I'm here...
-
-// an empty layer that turns things off and on
-L.ActionLayer = L.LayerGroup.extend({
-    initialize: function(options) {
-	this.hysplit = options['hysplit'];
-	this.fwd = options['fwd'];
-	L.LayerGroup.prototype.initialize.call(this, []);
-    },
-    onAdd: function() {
-	// L.LayerGroup.prototype.addLayer.call(this);
-	var cur_fwd = this.hysplit.cur_fwd;
-	if (cur_fwd != this.fwd) {
-	    this.hysplit.changeFwd();
-	    // this.hysplit.changeSite(this.hysplit.cur_name, this.fwd, this.hysplit.cur_date);
-	}
-    }
-});
-
-L.actionLayer = function(options) {
-    return new L.ActionLayer(options);
-};
 
 
 // A layer containing the contours and trajectories for HYSPLIT and
@@ -754,7 +728,8 @@ SiteSelector.prototype.clickMarker = function clickMarker(e) {
     var new_site = marker['site_name'];
     var cur_fwd = this._hysplit.cur_site.fwd;
     var cur_date = this._hysplit.cur_date;
-    this._hysplit.changeSite(new_site, cur_fwd, cur_date);
+    $("#_new_site").val(new_site).change();
+    // this._hysplit.changeSite(new_site, cur_fwd, cur_date);
 }
 
 SiteSelector.prototype.addSites = function addSites(sites) {
@@ -812,8 +787,8 @@ function Hysplit(start_site_name, start_site_fwd, hysplit_data_url, hysplit_onde
     this.origin_layer = L.layerGroup([]);
     this.timedim = L.timeDimension({times: []});
     // make two actionLayers (fwd and bck) to include in the layer controller
-    this.fwd_layer = L.actionLayer({hysplit: this, fwd: true});
-    this.bck_layer = L.actionLayer({hysplit: this, fwd: false});
+    // this.fwd_layer = L.actionLayer({hysplit: this, fwd: true});
+    // this.bck_layer = L.actionLayer({hysplit: this, fwd: false});
     this.cur_name = start_site_name;
     this.cur_fwd = start_site_fwd;
     this.dates = [];
@@ -904,39 +879,29 @@ Hysplit.prototype.updateOrigin = function updateOrigin(lat, lon) {
     var projected = this.map.project([lat, lon]);
     var offset = {x: size.x / 4, y: size.y / -4};
     var new_point = {x: projected.x + offset.x, y: projected.y + offset.y};
-    this.map.flyTo(this.map.unproject(new_point));
+    // map.panTo(new L.LatLng(lat, lon));
+    // this.map.flyTo(this.map.unproject(new_point));
+    // this.map.flyTo(this.origin_layer.getLayers()[0]);
+    this.map.flyTo([lat, lon]);
 }
-    
+
 Hysplit.prototype.addSiteSelector = function addSiteSelector() {
     /* 'store' locator div */
-    var locator = L.control({position: 'topright'});
-    var hysplit = this;
-    locator.onAdd = function (map) {
-        var div = L.DomUtil.create('div', 'info accordion');
-        $(div).append('<h4>Current Site: <span id="cur_site">(None)</span></h4>');
-        var site_div = document.createElement("div");
-        site_div.id = 'locator';
-        div.appendChild(site_div);
-        $(div).accordion({
-	    active: false,
-            collapsible: true,
-            heightStyle: "content",
-	    activate: function() {hysplit.site_map.invalidateSize()}
-        });
-        return div;
-    };
-    locator.addTo(this.map);
-
-    // add map and background
-
+    var info_accordion = $(this.sim_info._div);
+    info_accordion.append('<h4>Site Map</h4>');
+    var site_div = document.createElement("div");
+    site_div.id = 'locator';
+    info_accordion.append(site_div);
+    // fix the accordion again
+    info_accordion.accordion('refresh');
+    info_accordion.accordion("option", "active", 0);
     var site_map_options = {zoomControl: false,
-                            attributionControl: false}; 
-    this.site_map = L.map('locator', site_map_options).setView([43, -76], 6);
+                            attributionControl: false};
+    this.site_map = L.map(site_div, site_map_options).setView([43, -76], 6);
     L.tileLayer('https://api.tiles.mapbox.com/v4/{id}/{z}/{x}/{y}.png?access_token=pk.eyJ1Ijoic2tlcHRpa29zIiwiYSI6ImNqNWU2NjNhYzAwcDEycWpqdTJtNWJmNGYifQ.kxK-j2hWsX46EhH5PnsTfA', {
         maxZoom: 18,
         id: 'mapbox.streets'
     }).addTo(this.site_map);
-
     // add markers?
     var site_selector = new SiteSelector(this.sites, this.cur_name,
                                          this.origin_layer, this);
@@ -950,13 +915,158 @@ Hysplit.prototype.fwd_str = function fwd_str() {
 	return 'Backward';
     }
 }
+
+Hysplit.prototype.customSimForm = function() {
+    // organizing the custom simulation form
+    var custom_form = '<div><form id="hysplit" onSubmit="return false;">' +
+        'Latitude: <input id="userLat" type="text" name="lat"><br>' +
+        'Longitude: <input id="userLng" type="text" name="lon"><br>' +
+        'Height (m AGL): <input type="text" name="height" value="10"><br>' +
+        '<input type="checkbox" name="fwd" value="true" checked>Forward<br>' +
+        '<input type="checkbox" name="fwd" value="false">Backward<br>' +
+        'Simulated hours: <input type="text" name="records" value="10"><br>' +
+        '<input type="submit" value="Run HYSPLIT"></form>' +
+        '<p id="hysplit_message"></p></div>';
+    return '<h4>Custom Simulation:</h4>' + custom_form;
+}
+
+Hysplit.prototype.runCustomSim = function() {
+    var custom_form = $(this.sim_info._container).find('#hysplit');
+    $('#hysplit_message').text('');
+    // check that the form values are allowable
+    // make sure the number of hours is acceptable
+    var records = custom_form.find('input[name="records"]').val();
+    if (parseInt(records) > 18) {
+        $('#hysplit_message').text("Error: Can't simulate more than 18 hours.");
+        return false;
+    }
+    // make sure either forward or backward is checked
+    var fwd = custom_form.find('input:checkbox:checked').map(function() {
+        return $(this).val();
+    }).get();
+    var fwd_true = fwd.indexOf('true') > -1;
+    var bwd_true = fwd.indexOf('false') > -1;
+    if (!fwd_true && !bwd_true) {
+        $('#hysplit_message').text("Error: Must select forward or backward.");
+        return false;
+    }
+    // make sure latitude and longitude are acceptable
+    var lat = parseFloat(custom_form.find('input[name="lat"]').val());
+    var lon = parseFloat(custom_form.find('input[name="lon"]').val());
+    if (lat < 40 || lat > 46.5) {
+        $('#hysplit_message').text("Error: Latitude must be between 40 and 46.5.");
+        return false;
+    }
+    if (lon < -82.5 || lon > -69.5) {
+        $('#hysplit_message').text("Error: Latitude must be between -82.5 and -69.5.");
+        return false;
+    }
+    // check height
+    var height = parseFloat(custom_form.find('input[name="height"]').val());
+    if (height < 0 || height > 200) {
+        $('#hysplit_message').text("Error: Height must be between 0 and 200.");
+        return false;
+    }
+    // var url = hysplit.hysplit_ondemand_url + '?' + $(this).serialize();
+    // get the id of the time
+    var time_index = this.dates.map(Number).indexOf(+this.cur_date);
+    // console.log(hysplit.dates);
+    // console.log(hysplit.cur_date);
+    // console.log(time_index);
+    var time_id = this.time_json['index'][time_index];
+    var url = 'http://appsvr.asrc.cestm.albany.edu:5000/hysplit2?' +
+	custom_form.serialize() + '&time_id=' + time_id;
+
+    $('#hysplit_message').text('Running HYSPLIT...');
+    this.map.spin(true, {scale: 2.5});
+    $.post(url, function(data) {
+        // check for errors
+        if (data['error']) {
+            $('#hysplit_message').text('Error: ' + data['error']);
+            // hysplit.map.spin(false);
+            // return false;
+        } else {
+            $('#hysplit_message')[0].innerHTML += ' Done.';
+        }
+        $('#hysplit_message')[0].innerHTML +=
+            '<br>Simulations took ' + data['seconds'] + ' seconds.';
+        // get the path to the simulation results
+	this.custom_id = data;
+        var id = data['id'];
+        var fwd_str;
+        if (fwd_true) {
+            fwd_str = 'fwd';
+        } else {
+            fwd_str = 'bwd';
+        }
+        var data_dir = this.webdata_root + '/' + id + '/' + (fwd_true && bwd_true ? '' : fwd_str);
+        //$('#hysplit_message')[0].innerHTML +=
+        //  '<br>View raw data <a href="' + data_dir + '" target="_blank">here<a>.';
+        // add the site id to the hysplit site cache
+        this.cached_sites[id] = {};
+        this.cached_sites[id][fwd_true] = null;
+        this.changeSite('Custom', fwd_true, this.cur_date, true);
+        this.map.spin(false);
+    }.bind(this), 'json');
+}
+
+Hysplit.prototype.simInfoStart = function() {
+    // organizing the simulation info
+    var info_text = '<h4>Simulation Info:</h4>';
+    var fwd_options = '<select id="_new_fwd">' +
+	'<option value="true">Forward</option>' +
+	'<option value="false">Backward</option></select>';
+    var time_options = '<select id="_new_date">';
+    var date;
+    var date_str;
+    for (i=0; i < this.dates.length; i++) {
+	date = this.dates[i];
+	date_str = date.getUTCFullYear() + '-' +
+	    ("00" + (date.getUTCMonth() + 1)).slice(-2) + '-' +
+	    ("00" + date.getUTCDate()).slice(-2) + ' ' +
+	    ("00" + date.getUTCHours()).slice(-2) + ':00 UTC';
+	time_options += '<option value="' + date.toISOString() + '">' +
+	    date_str + '</option>';
+    }
+    time_options += '</select>';
+    var site;
+    var site_options = '<select id="_new_site">';
+    for (i=0; i < this.sites.length; i++) {
+	site = this.sites[i];
+	site_options += '<option value="' + site['stid'] + '">' +
+	    site['name'] + '</option>';
+    }
+    site_options += '</select>';
+    info_text += '<div><label>Direction:</label> ' + fwd_options + '<br>' +
+	'Release site: ' + site_options + '<br>' +
+        'Latitude: <span id="hysplit_latitude"></span>&#176; N<br>' +
+        'Longitude: <span id="hysplit_longitude"></span>&#176; W<br>' +
+	'<span id="hysplit_receptor">Release</span> height: <span id="hysplit_height"></span>m AGL<br>' +
+        '<span id="hysplit_reception">Release</span> time: ' + time_options + '<br>' +
+        '<span id="hysplit_duration_text"><span id="hysplit_reception">Release</span> duration: <span id="hysplit_duration"></span> hour(s)<br></span></div>';
+    return info_text;
+}
+
+Hysplit.prototype.updateSimInfo = function() {
+    // updating the simulation info
+    var info_div = $(this.sim_info._div);
+    info_div.find('#hysplit_site').text(this.cur_name);
+    info_div.find('#hysplit_latitude').text(this.cur_site.data['latitude']);
+    info_div.find('#hysplit_longitude').text(this.cur_site.data['longitude']);
+    info_div.find('#hysplit_height').text(this.cur_site.data['release_height']);
+    info_div.find('#hysplit_time').text(this.cur_site.data["release_time"]);
+    info_div.find('#hysplit_receptor').text(this.cur_fwd ? 'Release' : 'Receptor');
+    info_div.find('#hysplit_reception').text(this.cur_fwd ? 'Release' : 'Reception');
+    info_div.find('#hysplit_duration').text(this.cur_site.data['release_duration']);
+    info_div.find('#hysplit_duration_text').css('visibility', this.cur_fwd ? 'visible' : 'hidden');
+}
      
-Hysplit.prototype.addSimInfo = function addSimInfo() {
+Hysplit.prototype.addSimInfo = function() {
     /* simulation info box */  
 
-    var sim_info = L.control({position: 'topright'});
+    this.sim_info = L.control({position: 'topright'});
     var hysplit = this;
-    sim_info.onAdd = function (map) { 
+    this.sim_info.onAdd = function (map) { 
         this._div = L.DomUtil.create('div', 'info accordion');
         // Disable clicking when user's cursor is on the info box
         // (because we need to keep the lat/lon from earlier mouse
@@ -965,129 +1075,40 @@ Hysplit.prototype.addSimInfo = function addSimInfo() {
         $(this._div).accordion({
             collapsible: true,
             heightStyle: "content",
-            active: false
+            active: false,
+	    activate: function() {hysplit.site_map.invalidateSize()}
         });
-        var custom_form = '<div><form id="hysplit" onSubmit="return false;">' +
-            'Latitude: <input id="userLat" type="text" name="lat"><br>' +
-            'Longitude: <input id="userLng" type="text" name="lon"><br>' +
-            'Height (m AGL): <input type="text" name="height" value="10"><br>' +
-            '<input type="checkbox" name="fwd" value="true" checked>Forward<br>' +
-            '<input type="checkbox" name="fwd" value="false">Backward<br>' +
-            'Simulated hours: <input type="text" name="records" value="10"><br>' +
-            '<input type="submit" value="Run HYSPLIT"></form>' +
-            '<p id="hysplit_message"></p></div>';
-        $(this._div).append('<h4>Custom Simulation:</h4>' + custom_form);
+	$(this._div).append(hysplit.simInfoStart());
+	// fix the current site
+	$(this._div).find('#_new_site').val(hysplit.cur_name);
+	// add the control functions to the dropdown lists
+	$(this._div).find('#_new_fwd').change(function() {
+	    var new_fwd = $(this).find(":selected").val() == 'true';
+	    hysplit.changeFwd(new_fwd);
+	});
+	$(this._div).find('#_new_date').change(function() {
+	    var new_date = new Date($(this).find(":selected").text());
+	    hysplit.changeDate(new_date);
+	});
+	$(this._div).find('#_new_site').change(function() {
+	    var new_site = $(this).find(":selected").val();
+	    hysplit.switchSite(new_site);
+	});
+        $(this._div).append(hysplit.customSimForm());
         // set up the call to the flask server
-        $(this._div).find('#hysplit').submit(function() {
-            $('#hysplit_message').text('');
-            // check that the form values are allowable
-            // make sure the number of hours is acceptable
-            var records = $(this).find('input[name="records"]').val();
-            if (parseInt(records) > 18) {
-                $('#hysplit_message').text("Error: Can't simulate more than 18 hours.");
-                return false;
-            }
-            // make sure either forward or backward is checked
-            var fwd = $(this).find('input:checkbox:checked').map(function() {
-                return $(this).val();
-            }).get();
-            var fwd_true = fwd.indexOf('true') > -1;
-            var bwd_true = fwd.indexOf('false') > -1;
-            if (!fwd_true && !bwd_true) {
-                $('#hysplit_message').text("Error: Must select forward or backward.");
-                return false;
-            }
-            // make sure latitude and longitude are acceptable
-            var lat = parseFloat($(this).find('input[name="lat"]').val());
-            var lon = parseFloat($(this).find('input[name="lon"]').val());
-            if (lat < 40 || lat > 46.5) {
-                $('#hysplit_message').text("Error: Latitude must be between 40 and 46.5.");
-                return false;
-            }
-            if (lon < -82.5 || lon > -69.5) {
-                $('#hysplit_message').text("Error: Latitude must be between -82.5 and -69.5.");
-                return false;
-            }
-            // check height
-            var height = parseFloat($(this).find('input[name="height"]').val());
-            if (height < 0 || height > 200) {
-                $('#hysplit_message').text("Error: Height must be between 0 and 200.");
-                return false;
-            }
-            // var url = hysplit.hysplit_ondemand_url + '?' + $(this).serialize();
-	    // get the id of the time
-	    var time_index = hysplit.dates.map(Number).indexOf(+hysplit.cur_date);
-	    // console.log(hysplit.dates);
-	    // console.log(hysplit.cur_date);
-	    // console.log(time_index);
-	    var time_id = hysplit.time_json['index'][time_index];
-	    var url = 'http://appsvr.asrc.cestm.albany.edu:5000/hysplit2?' +
-		$(this).serialize() + '&time_id=' + time_id;
-
-            $('#hysplit_message').text('Running HYSPLIT...');
-            hysplit.map.spin(true, {scale: 2.5});
-            $.post(url, function(data) {
-                // check for errors
-                if (data['error']) {
-                    $('#hysplit_message').text('Error: ' + data['error']);
-                    // hysplit.map.spin(false);
-                    // return false;
-                } else {
-                    $('#hysplit_message')[0].innerHTML += ' Done.';
-                }
-                $('#hysplit_message')[0].innerHTML +=
-                    '<br>Simulations took ' + data['seconds'] + ' seconds.';
-                // get the path to the simulation results
-		hysplit.custom_id = data;
-                var id = data['id'];
-                var fwd_str;
-                if (fwd_true) {
-                    fwd_str = 'fwd';
-                } else {
-                    fwd_str = 'bwd';
-                }
-                var data_dir = hysplit.webdata_root + '/' + id + '/' + (fwd_true && bwd_true ? '' : fwd_str);
-                //$('#hysplit_message')[0].innerHTML +=
-                //  '<br>View raw data <a href="' + data_dir + '" target="_blank">here<a>.';
-                // add the site id to the hysplit site cache
-                hysplit.cached_sites[id] = {};
-                hysplit.cached_sites[id][fwd_true] = null;
-                hysplit.changeSite('Custom', fwd_true, hysplit.cur_date, true);
-                hysplit.map.spin(false);
-            }.bind(this), 'json');
-        });
+	var hysplit_form = $(this._div).find('#hysplit');
+        hysplit_form.submit(hysplit.runCustomSim.bind(hysplit));
+	
+	// add the site map
+	hysplit.addSiteSelector();
+	
+	$(this._div).accordion();
         this.update();
-        return this._div; 
+        return this._div;
     };
-    var hysplit = this;
-    sim_info.update = function (props) {
-        var first_update = $(this._div).children().length < 3;
-        if (!first_update) {
-            $(this._div).children().slice(0,2).remove();
-        }
-        var info_text;
-        info_text = '<h4>Simulation Info:</h4>';
-        if (hysplit.cur_site) {
-            info_text += '<div>Release site: ' + hysplit.cur_name + '<br>' +
-                'Trajectory: ' + hysplit.fwd_str() + '<br>' +
-                'Latitude: ' + hysplit.cur_site.data['latitude'] + '&#176; N<br>' +
-                'Longitude: ' + hysplit.cur_site.data['longitude'] + '&#176; W<br>';                    
-            if (hysplit.cur_fwd) {
-                info_text += 'Release height: ' + hysplit.cur_site.data['release_height'] + 'm AGL<br>' +
-                    'Release time: ' + hysplit.cur_site.data["release_time"] + ' UTC<br>' +
-                    'Release duration: ' + hysplit.cur_site.data["release_duration"] + ' hour(s)<br></div>';
-            } else {
-                info_text += 'Receptor height: ' + hysplit.cur_site.data['release_height'] + 'm AGL<br>' +
-                    'Reception time: ' + hysplit.cur_site.data["release_time"] + ' UTC<br></div>';
-            }
-        }
-        $(this._div).prepend(info_text);
-        $(this._div).accordion('refresh');
-        // if (first_update) {
-        //     $(this._div).accordion("option", "active", 0);
-        // }
-    };
-    this.sim_info = sim_info.addTo(this.map);
+    this.sim_info.update = this.updateSimInfo.bind(this);
+    this.sim_info.addTo(this.map);
+    $(this.sim_info._container).accordion('refresh')
     // set up the lat/lon action
     this.map.on('click', function(e) {
         var latlng = e.latlng;
@@ -1098,18 +1119,14 @@ Hysplit.prototype.addSimInfo = function addSimInfo() {
     }); 
 }
 
-Hysplit.prototype.addLayerControl = function addLayerControl() {
+Hysplit.prototype.addLayerControl = function() {
     var this2 = this;
-    var baseMaps = {
-        'Forward': this2.fwd_layer,
-        'Backward': this2.bck_layer
-    }
     var overlayMaps = {
         'Concentration': this2.contour_layer,
         'Ensemble Trajectories': this2.ens_trajectory_layer,
         'Single Trajectory': this2.single_trajectory_layer
     }
-    L.control.layers(baseMaps, overlayMaps, {position: 'topleft'}).addTo(this.map);
+    L.control.layers(null, overlayMaps, {position: 'topleft'}).addTo(this.map);
 }
 
 Hysplit.prototype.addTimeSlider = function addTimeSlider() {
@@ -1118,34 +1135,6 @@ Hysplit.prototype.addTimeSlider = function addTimeSlider() {
                         playReverseButton: true};
     this.time_slider = L.control.timeDimension(time_options);
     this.time_slider.addTo(this.map);
-}
-
-Hysplit.prototype.addDateSelector = function addDateSelector() {
-    var hysplit = this;
-    var date_selector = L.control({position: 'bottomleft'});
-    date_selector.onAdd = function (map) { 
-	this._div = L.DomUtil.create('div', 'info date_selector');
-	// Disable clicking when user's cursor is on the info box
-	// (because we need to keep the lat/lon from earlier mouse
-	// clicks!)
-	L.DomEvent.disableClickPropagation(this._div);
-	var custom_form = '<div><form id="_date_selector" onSubmit="return false;">' +
-	    '<select id="_new_date">';
-	for (i=0; i < hysplit.dates.length; i++) {
-	    custom_form += '<option value="' + hysplit.dates[i] + '">' +
-		hysplit.dates[i].toUTCString() + '</option>';
-	}
-	// custom_form += '</select><input type="submit" value="Update map"></form></div>';
-	custom_form += '</select></form></div>';
-	$(this._div).append('<h4>Release/Reception Date:</h4>' + custom_form);
-	// and now the updating function
-	$(this._div).find('#_date_selector').change(function() {
-	    var new_date = new Date($('#_new_date').find(":selected").text());
-	    hysplit.changeDate(new_date);
-	});
-	return this._div
-    }
-    date_selector.addTo(this.map);
 }
 
 Hysplit.prototype.initialize = function initialize(divid) {
@@ -1185,16 +1174,13 @@ Hysplit.prototype.initialize = function initialize(divid) {
 	var siteArray_options = {values: site_dim_values,
 				 makeLayer: makeSite};
 	this.siteArray = L.layerArray(siteArray_options);
-	this.map = L.map(divid, {layers: [this.fwd_layer, this.contour_layer,
-					  this.ens_trajectory_layer,
-					  this.single_trajectory_layer]}).
+	this.map = L.map(divid, {layers: [this.contour_layer]}).
 	    setView([43, -74.5], 7);
 	this.addTileLayer();
-	this.addSiteSelector();
+	// this.addSiteSelector();
 	this.origin_layer.addTo(this.map);
 	this.addLayerControl();
 	this.addTimeSlider();
-	this.addDateSelector();
 	this.siteArray.addTo(this.map);
 	// console.log(this.siteArray.values);
 	this.changeSite(this.cur_name, this.cur_fwd, this.cur_date).done(function() {
@@ -1248,17 +1234,19 @@ Hysplit.prototype.changeSite = function changeSite(name, fwd, date, custom=false
 	return this.siteArray.switchToValue(vals).done(function() {
 	    this.cur_site = this.siteArray.cache[this.siteArray.valToArrayInd(vals)];
 	    this.update_info();
+	    this.updateOrigin(this.cur_site.data['latitude'],
+			      this.cur_site.data['longitude'])
 	}.bind(this));
     }
 }
 
-Hysplit.prototype.changeFwd = function changeFwd() {
-    var cur_fwd = this.cur_fwd;
-    // if (this.custom) {
-    this.changeSite(this.cur_name, !this.cur_fwd, this.cur_date, this.custom);
-    // } else {
-    // 	this.changeSite(this.cur_name, !this.cur_fwd, this.cur_date);	
-    // }
+Hysplit.prototype.switchSite = function(stid) {
+    this.changeSite(stid, this.cur_fwd, this.cur_date, this.custom);
+}
+
+Hysplit.prototype.changeFwd = function changeFwd(fwd) {
+    var new_fwd = fwd || !this.cur_fwd;
+    this.changeSite(this.cur_name, new_fwd, this.cur_date, this.custom);
 }
 
 Hysplit.prototype.changeDate = function changeDate(date) {
