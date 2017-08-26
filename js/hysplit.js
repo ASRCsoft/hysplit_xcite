@@ -894,7 +894,6 @@ Hysplit.prototype.addSiteSelector = function addSiteSelector() {
     info_accordion.append(site_div);
     // fix the accordion again
     info_accordion.accordion('refresh');
-    info_accordion.accordion("option", "active", 0);
     var site_map_options = {zoomControl: false,
                             attributionControl: false};
     this.site_map = L.map(site_div, site_map_options).setView([43, -76], 6);
