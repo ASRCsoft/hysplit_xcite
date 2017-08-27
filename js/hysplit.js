@@ -874,11 +874,11 @@ Hysplit.prototype.addLegend = function addLegend() {
 
 Hysplit.prototype.updateOrigin = function updateOrigin(lat, lon) {
     this.origin_layer.getLayers()[0].setLatLng([lat, lon]);
-    var bounds = this.map.getPixelBounds();
-    var size = {x: bounds.max.x - bounds.min.x, y: bounds.max.y - bounds.min.y};
-    var projected = this.map.project([lat, lon]);
-    var offset = {x: size.x / 4, y: size.y / -4};
-    var new_point = {x: projected.x + offset.x, y: projected.y + offset.y};
+    // var bounds = this.map.getPixelBounds();
+    // var size = {x: bounds.max.x - bounds.min.x, y: bounds.max.y - bounds.min.y};
+    // var projected = this.map.project([lat, lon]);
+    // var offset = {x: size.x / 4, y: size.y / -4};
+    // var new_point = {x: projected.x + offset.x, y: projected.y + offset.y};
     // map.panTo(new L.LatLng(lat, lon));
     // this.map.flyTo(this.map.unproject(new_point));
     // this.map.flyTo(this.origin_layer.getLayers()[0]);
@@ -917,16 +917,30 @@ Hysplit.prototype.fwd_str = function fwd_str() {
 
 Hysplit.prototype.customSimForm = function() {
     // organizing the custom simulation form
+    var time_options = '<select id="_custom_date">';
+    var date;
+    var date_str;
+    for (i=0; i < this.dates.length; i++) {
+	date = this.dates[i];
+	date_str = date.getUTCFullYear() + '-' +
+	    ("00" + (date.getUTCMonth() + 1)).slice(-2) + '-' +
+	    ("00" + date.getUTCDate()).slice(-2) + ' ' +
+	    ("00" + date.getUTCHours()).slice(-2) + ':00 UTC';
+	time_options += '<option value="' + date.toISOString() + '">' +
+	    date_str + '</option>';
+    }
+    time_options += '</select>';
     var custom_form = '<div><form id="hysplit" onSubmit="return false;">' +
         'Latitude: <input id="userLat" type="text" name="lat"><br>' +
         'Longitude: <input id="userLng" type="text" name="lon"><br>' +
         'Height (m AGL): <input type="text" name="height" value="10"><br>' +
-        '<input type="checkbox" name="fwd" value="true" checked>Forward<br>' +
-        '<input type="checkbox" name="fwd" value="false">Backward<br>' +
+        '<input type="radio" name="fwd" value="true" checked>Forward<br>' +
+        '<input type="radio" name="fwd" value="false">Backward<br>' +
+	'Release/Reception time: ' + time_options + '<br>' +
         'Simulated hours: <input type="text" name="records" value="10"><br>' +
         '<input type="submit" value="Run HYSPLIT"></form>' +
         '<p id="hysplit_message"></p></div>';
-    return '<h4>Custom Simulation:</h4>' + custom_form;
+    return '<h4>Custom Simulation</h4>' + custom_form;
 }
 
 Hysplit.prototype.runCustomSim = function() {
@@ -1011,7 +1025,7 @@ Hysplit.prototype.runCustomSim = function() {
 
 Hysplit.prototype.simInfoStart = function() {
     // organizing the simulation info
-    var info_text = '<h4>Simulation Info:</h4>';
+    var info_text = '<h4>Simulation Info</h4>';
     var fwd_options = '<select id="_new_fwd">' +
 	'<option value="true">Forward</option>' +
 	'<option value="false">Backward</option></select>';

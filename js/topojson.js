@@ -1,7 +1,6 @@
 // leaflet classes for topojson-based layers
 
 L.TopoJSON = L.GeoJSON.extend({
-    // A lazy-loading topojson layer for leaflet. Cool right?
     addData: function (data) {
 	// correctly add topojson data
 	var geojson, key;

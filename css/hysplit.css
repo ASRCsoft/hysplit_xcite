@@ -8,13 +8,20 @@ body {margin: 0}
 #map {
     width: 100%;
     height: 100%;
-    min-height: 650px;
+    /* min-height: 650px; */
 }
 #locator {
     width: 350px;
+    max-width: 100%;
     height: 350px;
     z-index: 0;
     border-radius: 2px;
+}
+.leaflet-top, .leaflet-right {
+    max-width: 90%;
+}
+.leaflet-top div, .leaflet-right div {
+    max-width: 100%;
 }
 .leaflet-top.leaflet-right .leaflet-control {
     clear: none;
