@@ -851,20 +851,19 @@ Hysplit.prototype.addLegend = function addLegend() {
             grades = levels,
             labels = [],
             from, to;
-        var legend_title = '<h4>Concentration</h4>';
         var units;
         if (this2.cur_site.heights[this2.cur_site.height] == 0) {
             units = 'ng/m<sup>2</sup>';
         } else {
             units = 'ng/m<sup>3</sup>';
         }
+	var legend_title = '<h4>Concentration<br>[<span class="_units_here">' + units + '</span>]</h4>';
         for (var i = grades.length - 1; i >= 0; i--) {
             from = grades[i];
             to = grades[i + 1];
             labels.push('<i style="background:' + this2.getColor(from) + '"></i> <b>' +
                         '10<sup>' + from + '</sup>' +
-                        (i + 1 < grades.length ? '&ndash;10<sup>' + to + '</sup>' : '+') +
-                        '</b> <span class="_units_here">' + units + '</span>');
+                        (i + 1 < grades.length ? '&ndash;10<sup>' + to + '</sup>' : '+'));
         }
         div.innerHTML = legend_title + labels.join('<br>');
         return div;
