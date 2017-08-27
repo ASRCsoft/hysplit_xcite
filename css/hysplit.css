@@ -11,9 +11,9 @@ body {margin: 0}
     /* min-height: 650px; */
 }
 #locator {
-    width: 350px;
+    width: 280px;
     max-width: 100%;
-    height: 350px;
+    height: 280px;
     z-index: 0;
     border-radius: 2px;
 }
@@ -52,11 +52,6 @@ body {margin: 0}
     opacity: 0.7;
 }
 
-/* needed to fix the fwd-switching button! */
-.easy-button-button .button-state {
-    display: inline;
-}
-
 /* fix superscript line heights- taken from
 https://css-tricks.com/snippets/css/prevent-superscripts-and-subscripts-from-affecting-line-height/ */
 sup, sub {
@@ -82,4 +77,10 @@ sub {
 .hysplit_trajectory_tooltip {
     width: 500px;
     height: 200px;
+}
+
+/* fix the time dimension player reverse play button height inconsistency issue */
+.timecontrol-play.reverse:before {
+    transform: scaleX(-1);
+    margin-top: 0;
 }

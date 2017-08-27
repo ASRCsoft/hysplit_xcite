@@ -825,9 +825,10 @@ Hysplit.prototype.getTimes = function getTimes() {
 Hysplit.prototype.addTileLayer = function addTileLayer() {
     L.tileLayer('https://api.tiles.mapbox.com/v4/{id}/{z}/{x}/{y}.png?access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw', {
         maxZoom: 18,
-        attribution: 'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors, ' +
-            '<a href="http://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, ' +
-            'Imagery Â© <a href="http://mapbox.com">Mapbox</a>',
+        // attribution: 'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors, ' +
+        //     '<a href="http://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, ' +
+        //     'Imagery Â© <a href="http://mapbox.com">Mapbox</a>',
+	attribution: false,
         id: 'mapbox.light'
     }).addTo(this.map);
 }
@@ -895,7 +896,7 @@ Hysplit.prototype.addSiteSelector = function addSiteSelector() {
     info_accordion.accordion('refresh');
     var site_map_options = {zoomControl: false,
                             attributionControl: false};
-    this.site_map = L.map(site_div, site_map_options).setView([43, -76], 6);
+    this.site_map = L.map(site_div, site_map_options).setView([42.85, -76.05], 6);
     L.tileLayer('https://api.tiles.mapbox.com/v4/{id}/{z}/{x}/{y}.png?access_token=pk.eyJ1Ijoic2tlcHRpa29zIiwiYSI6ImNqNWU2NjNhYzAwcDEycWpqdTJtNWJmNGYifQ.kxK-j2hWsX46EhH5PnsTfA', {
         maxZoom: 18,
         id: 'mapbox.streets'
