@@ -103,3 +103,8 @@ sub {
 	width: 150px;
     }
 }
+
+/* fix z-index issue for accordion */
+.leaflet-top.leaflet-right {
+    z-index: 9999;
+}
