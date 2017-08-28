@@ -1086,7 +1086,10 @@ Hysplit.prototype.addSimInfo = function() {
             collapsible: true,
             heightStyle: "content",
             active: false,
-	    activate: function() {hysplit.site_map.invalidateSize()}
+	    activate: function() {
+		// $(hysplit.site_map._container).width($(hysplit.site_map._container).parent().width() - 63.6);
+		hysplit.site_map.invalidateSize();
+	    }
         });
 	$(this._div).append(hysplit.simInfoStart());
 	// fix the current site
