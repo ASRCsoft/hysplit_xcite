@@ -926,7 +926,7 @@ Hysplit.prototype.customSimForm = function() {
 	    ("00" + (date.getUTCMonth() + 1)).slice(-2) + '-' +
 	    ("00" + date.getUTCDate()).slice(-2) + ' ' +
 	    ("00" + date.getUTCHours()).slice(-2) + ':00 UTC';
-	time_options += '<option value="' + date.toISOString() + '">' +
+	time_options += '<option value="' + this.time_json.index[i] + '">' +
 	    date_str + '</option>';
     }
     time_options += '</select>';
@@ -954,9 +954,11 @@ Hysplit.prototype.runCustomSim = function() {
         return false;
     }
     // make sure either forward or backward is checked
-    var fwd = custom_form.find('input:checkbox:checked').map(function() {
-        return $(this).val();
-    }).get();
+    var fwd = custom_form.find("input[name='fwd']:checked").val();
+    // old checkbox code:
+    // var fwd = custom_form.find('input:checkbox:checked').map(function() {
+    //     return $(this).val();
+    // }).get();
     var fwd_true = fwd.indexOf('true') > -1;
     var bwd_true = fwd.indexOf('false') > -1;
     if (!fwd_true && !bwd_true) {
@@ -980,13 +982,8 @@ Hysplit.prototype.runCustomSim = function() {
         $('#hysplit_message').text("Error: Height must be between 0 and 200.");
         return false;
     }
-    // var url = hysplit.hysplit_ondemand_url + '?' + $(this).serialize();
     // get the id of the time
-    var time_index = this.dates.map(Number).indexOf(+this.cur_date);
-    // console.log(hysplit.dates);
-    // console.log(hysplit.cur_date);
-    // console.log(time_index);
-    var time_id = this.time_json['index'][time_index];
+    var time_id = $('#_custom_date').find(":selected").val();
     var url = 'http://appsvr.asrc.cestm.albany.edu:5000/hysplit2?' +
 	custom_form.serialize() + '&time_id=' + time_id;
 
@@ -1144,6 +1141,8 @@ Hysplit.prototype.addLayerControl = function() {
 
 Hysplit.prototype.addTimeSlider = function addTimeSlider() {
     var time_options = {timeDimension: this.timedim, loopButton: true,
+			// timeSlider: false, speedSlider: false,
+			// minSpeed: 4,
                         timeSliderDragUpdate: true,
                         playReverseButton: true};
     this.time_slider = L.control.timeDimension(time_options);

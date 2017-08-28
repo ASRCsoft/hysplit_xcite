@@ -84,3 +84,9 @@ sub {
     transform: scaleX(-1);
     margin-top: 0;
 }
+
+/*  */
+.leaflet-bar-timecontrol a.timecontrol-date.utc,
+.leaflet-bar-timecontrol a.timecontrol-date.utc:hover {
+    min-width: unset;
+}
