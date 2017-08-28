@@ -97,10 +97,6 @@ sub {
 	width: 0;
 	float: inherit;
     }
-    .leaflet-bar-timecontrol .timecontrol-date,
-    .leaflet-bar-timecontrol .timecontrol-slider {
-	float: inherit;
-    }
     .leaflet-touch .leaflet-bar-timecontrol .timecontrol-slider .slider {
 	width: 150px;
     }
