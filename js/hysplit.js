@@ -318,12 +318,15 @@ L.SiteLayer = L.LayerGroup.extend({
 	this.data;
 	this.times;
 	this.heights;
+	this.json;
 	// a layerArray layer with contour topojson layers
 	this.contours;
 	// ensemble trajectories
   	this.trajectories;
 	// single trajectory
 	this.trajectory;
+	// trajectory circle heights
+	this.trajectory_heights;
 	this.getColor = this._hysplit.getColor;
 	this.time_slider;
 	this.height_slider;
@@ -379,16 +382,35 @@ L.SiteLayer = L.LayerGroup.extend({
     },
     ensTrajStyle: function(feature) {
   	return {
-  	    weight: 3,
+  	    weight: 2,
   	    opacity: .6,
   	    color: '#5075DB'
   	};
     },
     singleTrajStyle: function(feature) {
 	return {
-	    weight: 3,
+	    weight: 2,
 	    opacity: .6,
 	    color: '#FF0033'
+	};
+    },
+    
+    trajHeightStyle: function(feature) {
+	return {
+	    weight: 1,
+	    // strokeWidth: 0.5,
+	    opacity: .6,
+	    color: '#FF0033',
+	    radius: 0.5 + (9.5 * feature.properties.height / 2000)
+	};
+    },
+    ensTrajHeightStyle: function(feature) {
+	return {
+	    // strokeWidth: 0.5,
+	    weight: 1,
+	    opacity: .6,
+	    color: '#5075DB',
+	    radius: 0.5 + (9.5 * feature.properties.height / 2000)
 	};
     },
     resetTimedim: function() {
@@ -417,6 +439,76 @@ L.SiteLayer = L.LayerGroup.extend({
 	    }
 	}
     },
+    makeTrajectoryHeights: function() {
+	var featureCollection = {type: "FeatureCollection",
+				 features: []};
+	// 1) for each point, make a json feature with time property
+	var tr = this.data.trajectory;
+	var tr_geom = tr.geometry;
+	var tr_coords = tr_geom.coordinates;
+	var tr_heights = tr.properties.heights;
+	var tr_times = tr.properties.times;
+	var ncoords = tr_coords.length;
+	var point;
+	for (var i=0; i<ncoords; i++) {
+	    point = {type: "Feature", geometry: {}};
+	    point.geometry['type'] = 'Point';
+	    point.geometry['coordinates'] = [tr_coords[i][0], tr_coords[i][1]];
+	    point['properties'] = {time: tr_times[i],
+				   height: tr_heights[i]};
+	    featureCollection.features.push(point);
+	}
+	// 2) combine into a featurecollection
+	var trajectory_heights_layer = L.geoJSON(featureCollection, {
+	    pointToLayer: function (feature, latlng) {
+		return L.circleMarker(latlng);
+	    },
+	    style: this.trajHeightStyle
+	    // onEachFeature: onEachTrajectory,
+	});
+	// 3) create the timedimension layer
+	var traj_options = {timeDimension: this._hysplit.timedim,
+			    fwd: this.fwd};
+	this.trajectory_heights = L.timeDimension.layer.geoJson2(trajectory_heights_layer,
+								 traj_options);
+    },
+    makeEnsTrajectoryHeights: function() {
+	var featureCollection = {type: "FeatureCollection",
+				 features: []};
+	// 1) for each point, make a json feature with time property
+	var trs = this.data.trajectories.features;
+	var tr;
+	for (var j=0; j<trs.length; j++) {
+	    tr = trs[j];
+	    var tr_geom = tr.geometry;
+	    var tr_coords = tr_geom.coordinates;
+	    var tr_heights = tr.properties.heights;
+	    var tr_times = tr.properties.times;
+	    var ncoords = tr_coords.length;
+	    var point;
+	    for (var i=0; i<ncoords; i++) {
+		point = {type: "Feature", geometry: {}};
+		point.geometry['type'] = 'Point';
+		point.geometry['coordinates'] = [tr_coords[i][0], tr_coords[i][1]];
+		point['properties'] = {time: tr_times[i],
+				       height: tr_heights[i]};
+		featureCollection.features.push(point);
+	    }
+	}
+	// 2) combine into a featurecollection
+	var trajectory_heights_layer = L.geoJSON(featureCollection, {
+	    pointToLayer: function (feature, latlng) {
+		return L.circleMarker(latlng);
+	    },
+	    style: this.ensTrajHeightStyle
+	    // onEachFeature: onEachTrajectory,
+	});
+	// 3) create the timedimension layer
+	var traj_options = {timeDimension: this._hysplit.timedim,
+			    fwd: this.fwd};
+	this.ens_trajectory_heights = L.timeDimension.layer.geoJson2(trajectory_heights_layer,
+								     traj_options);
+    },
     loadData: function() {
 	// load the site's metadata, if needed
 	if (!!this.data) {
@@ -431,30 +523,28 @@ L.SiteLayer = L.LayerGroup.extend({
 	    this.data = json;
 	    this.times = json['times'].map(function(text) {return new Date(text)});
 	    this.heights = json['heights'];
-	    try {
-		// get the ensemble trajectories if they exist
-		var trajectories = json['trajectories'];
-		var ens_trajectory_layer = L.geoJSON(trajectories, {
-		    style: this.ensTrajStyle,
-		    onEachFeature: onEachTrajectory,
-		    smoothFactor: 1
-		});
-		var traj_options = {timeDimension: this._hysplit.timedim,
-				    fwd: this.fwd};
-		this.trajectories = L.timeDimension.layer.geoJson2(ens_trajectory_layer, traj_options);
-	    } catch(err) {}
-	    try {
-		// get the trajectory if it exists
-		var trajectory = json['trajectory'];
-		var single_trajectory_layer = L.geoJSON(trajectory, {
-		    style: this.singleTrajStyle,
-		    onEachFeature: onEachTrajectory,
-		    smoothFactor: 1
-		});
-		var traj_options = {timeDimension: this._hysplit.timedim,
-				    fwd: this.fwd};
-		this.trajectory = L.timeDimension.layer.geoJson2(single_trajectory_layer, traj_options);
-	    } catch(err) {}
+	    // get the ensemble trajectories
+	    var trajectories = json['trajectories'];
+	    var ens_trajectory_layer = L.geoJSON(trajectories, {
+		style: this.ensTrajStyle,
+		onEachFeature: onEachTrajectory,
+		smoothFactor: 1
+	    });
+	    var traj_options = {timeDimension: this._hysplit.timedim,
+				fwd: this.fwd};
+	    this.trajectories = L.timeDimension.layer.geoJson2(ens_trajectory_layer, traj_options);
+	    this.makeEnsTrajectoryHeights();
+	    // get the trajectory
+	    var trajectory = json['trajectory'];
+	    var single_trajectory_layer = L.geoJSON(trajectory, {
+		style: this.singleTrajStyle,
+		onEachFeature: onEachTrajectory,
+		smoothFactor: 1
+	    });
+	    var traj_options = {timeDimension: this._hysplit.timedim,
+				fwd: this.fwd};
+	    this.trajectory = L.timeDimension.layer.geoJson2(single_trajectory_layer, traj_options);
+	    this.makeTrajectoryHeights();
 	    var folder = this.folder();
 	    var makeContours = function(ind) {
 		if (ind.some(function(x) {return x < 0})) {
@@ -465,7 +555,6 @@ L.SiteLayer = L.LayerGroup.extend({
 		var contour_url = 'http://appsvr.asrc.cestm.albany.edu:5000/contours?sim_id=' +
 		    this.sim_id + '&height=' + ind[1] +
 		    '&time=' + ind[0];
-		// return $.getJSON(contour_path).then(function(topojson) {
 		return $.getJSON(contour_url).then(function(topojson) {
 		    return L.topoJson(topojson, {
 			style: contourStyle,
@@ -561,7 +650,9 @@ L.SiteLayer = L.LayerGroup.extend({
     clearLayers: function() {
 	this.contour_layer.removeLayer(this.contours);
 	this.ens_trajectory_layer.removeLayer(this.trajectories);
+	this.ens_trajectory_layer.removeLayer(this.ens_trajectory_heights);
 	this.single_trajectory_layer.removeLayer(this.trajectory);
+	this.single_trajectory_layer.removeLayer(this.trajectory_heights);
 	this.td_layer.remove();
     },
     onAdd: function(map) {
@@ -571,7 +662,9 @@ L.SiteLayer = L.LayerGroup.extend({
 	    this.setup_sliders(map);
 	    this.contour_layer.addLayer(this.contours);
 	    this.ens_trajectory_layer.addLayer(this.trajectories);
+	    this.ens_trajectory_layer.addLayer(this.ens_trajectory_heights);
 	    this.single_trajectory_layer.addLayer(this.trajectory);
+	    this.single_trajectory_layer.addLayer(this.trajectory_heights);
 	    this.td_layer.addTo(map);
 	    // first check to see if a contour has already been added
 	    if (!this.contours.ind) {
