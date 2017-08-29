@@ -408,10 +408,24 @@ L.SiteLayer = L.LayerGroup.extend({
 	    // release
 	    var hysplit = this._hysplit;
 	    if (hysplit.cur_site) {
-		var cur_hours = hysplit.cur_site.contours.time || 0;
-		console.log(cur_hours);
+		// are we changing the direction?
+		var changeFwd = this._hysplit.cur_site.fwd != this.fwd;
 		hysplit.timedim.setAvailableTimes(this.times, 'replace');
-		hysplit.timedim.setCurrentTime(this.times[cur_hours]);
+		// do different things depending on if we're switching
+		// directions
+		if (changeFwd) {
+		    if (this.fwd) {
+			// start at the first hour after release
+			hysplit.timedim.setCurrentTime(this.times[0]);
+		    } else {
+			// start at the last hour before reception
+			hysplit.timedim.setCurrentTime(this.times[this.times.length - 1]);
+		    }
+		} else {
+		    // keep the current hour index
+		    var cur_hours = hysplit.cur_site.contours.time || 0;
+		    hysplit.timedim.setCurrentTime(this.times[cur_hours]);
+		}
 	    } else {
 		hysplit.timedim.setAvailableTimes(this.times, 'replace');
 	    }
