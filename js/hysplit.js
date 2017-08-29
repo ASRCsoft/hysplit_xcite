@@ -889,8 +889,30 @@ function Hysplit(start_site_name, start_site_fwd, hysplit_data_url, hysplit_onde
     this.hysplit_ondemand_url = hysplit_ondemand_url ? hysplit_ondemand_url : 'http://appsvr.asrc.cestm.albany.edu:5000';
     // this.sites = sites;
     this.contour_layer = L.layerGroup([]);
+    this.contour_layer.on('add', function() {
+	$('#conc_legend').css('display', 'inherit');
+    });
+    this.contour_layer.on('remove', function() {
+	$('#conc_legend').css('display', 'none');
+    });
     this.ens_trajectory_layer = L.layerGroup([]);
+    this.ens_trajectory_layer.on('add', function() {
+	$('#height_legend').css('display', 'inherit');
+    });
+    this.ens_trajectory_layer.on('remove', function() {
+	if (!this.map.hasLayer(this.single_trajectory_layer)) {
+	    $('#height_legend').css('display', 'none');   
+	}
+    }.bind(this));
     this.single_trajectory_layer = L.layerGroup([]);
+    this.single_trajectory_layer.on('add', function() {
+	$('#height_legend').css('display', 'inherit');
+    });
+    this.single_trajectory_layer.on('remove', function() {
+	if (!this.map.hasLayer(this.ens_trajectory_layer)) {
+	    $('#height_legend').css('display', 'none');   
+	}
+    }.bind(this));
     this.origin_layer = L.layerGroup([]);
     this.timedim = L.timeDimension({times: []});
     // make two actionLayers (fwd and bck) to include in the layer controller
@@ -971,9 +993,31 @@ Hysplit.prototype.addLegend = function addLegend() {
             to = grades[i + 1];
             labels.push('<i style="background:' + this2.getColor(from) + '"></i> <b>' +
                         '10<sup>' + from + '</sup>' +
-                        (i + 1 < grades.length ? '&ndash;10<sup>' + to + '</sup>' : '+'));
+                        (i + 1 < grades.length ? '&ndash;10<sup>' + to + '</sup>' : '+') + '</b>');
         }
-        div.innerHTML = legend_title + labels.join('<br>');
+        div.innerHTML = '<div id="conc_legend">' + legend_title + labels.join('<br>') + '</div>';
+	// now the circle legend
+	legend_title = '<h4 style="width: 80px;">Height<br>[m AGL]</h4>';
+	labels = [];
+	var label_heights = [0, 1000, 2000, 3000];
+	var tops = [-2, 2.5, 7, 20];
+	var height, size, margin, lineheight;
+	var getSize = function(height) {
+	    return 2 * (0.5 + (9.5 * height / 2000));
+	}
+	var maxsize = getSize(label_heights[label_heights.length - 1]);
+	var sym_width = maxsize;
+        for (i=0; i<label_heights.length; i++) {
+            height = label_heights[i];
+	    size = getSize(height);
+	    margin = (sym_width - size) / 2;
+	    lineheight = Math.max(size, 18);
+            labels.push('<i class="circle" style="width:' + size + 'px; height:' +
+			size + 'px; margin-left:' + margin + 'px; margin-right:' +
+			margin + 'px;"></i> <b><span class="height" style="top: ' + tops[i] + ';">' +
+			label_heights[i] + '</span></b>');
+        }
+        div.innerHTML += '<div id="height_legend">' + legend_title + labels.join('<br>') + '</div>';
         return div;
     };
     legend.addTo(this.map);

@@ -108,3 +108,19 @@ sub {
 .leaflet-top.leaflet-right {
     z-index: 9999;
 }
+/* for the circle legend */
+.legend .circle {
+    border: rgba(0,0,0,.6) solid 1px;
+    border-radius: 50%;
+    background-color: rgba(0,0,0,.2);
+    clear: left;
+    margin-top: 5px;
+}
+.legend span.height {
+    line-height: inherit;
+    position: relative;
+    left: 10px;
+}
+#height_legend {
+    display: none;
+}
