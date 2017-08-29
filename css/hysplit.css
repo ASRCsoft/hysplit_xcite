@@ -123,4 +123,5 @@ sub {
 }
 #height_legend {
     display: none;
+    margin-top: 8px;
 }

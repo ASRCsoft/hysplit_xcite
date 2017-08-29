@@ -891,9 +891,11 @@ function Hysplit(start_site_name, start_site_fwd, hysplit_data_url, hysplit_onde
     this.contour_layer = L.layerGroup([]);
     this.contour_layer.on('add', function() {
 	$('#conc_legend').css('display', 'inherit');
+	$('#height_legend').css('margin-top', '8px');
     });
     this.contour_layer.on('remove', function() {
 	$('#conc_legend').css('display', 'none');
+	$('#height_legend').css('margin-top', '0');
     });
     this.ens_trajectory_layer = L.layerGroup([]);
     this.ens_trajectory_layer.on('add', function() {
@@ -910,7 +912,7 @@ function Hysplit(start_site_name, start_site_fwd, hysplit_data_url, hysplit_onde
     });
     this.single_trajectory_layer.on('remove', function() {
 	if (!this.map.hasLayer(this.ens_trajectory_layer)) {
-	    $('#height_legend').css('display', 'none');   
+	    $('#height_legend').css('display', 'none');
 	}
     }.bind(this));
     this.origin_layer = L.layerGroup([]);
