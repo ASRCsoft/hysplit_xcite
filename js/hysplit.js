@@ -330,30 +330,11 @@ L.SiteLayer = L.LayerGroup.extend({
 	this.timedim;
 	this.td_layer;
     },
-    folder: function() {
-	// get the path to the metadata json for this site
-	var fwd_folder;
-	if (this.fwd) {
-	    fwd_folder = 'fwd/';
-	} else {
-	    fwd_folder = 'bwd/';
-	}
-	return this._hysplit.hysplit_data_url + '/' + this.date + '_' +
-	    this.name + '/' + fwd_folder;
-    },
-    meta_path: function() {
-	// get the path to the metadata json for this site
-	return this.folder() + 'meta.json';
-    },
     meta_url: function() {
 	// get the url for the metadata json for this site
-	return 'http://appsvr.asrc.cestm.albany.edu:5000/metadata?site_id=' +
+	return this._hysplit.data_server_url + '/metadata?site_id=' +
 	    this.options['site_id'] + '&time_id=' +
 	    this.options['time_id'] + '&fwd=' + this.fwd;
-    },
-    contour_path: function(time, height) {
-	// get the path to the specified contour json file
-	return this.folder() + 'height' + height + '_time' + time + '.json';
     },
     highlightFeature: function(e) {
 	var contour = e.target;
@@ -469,23 +450,18 @@ L.SiteLayer = L.LayerGroup.extend({
 				    fwd: this.fwd};
 		this.trajectory = L.timeDimension.layer.geoJson2(single_trajectory_layer, traj_options);
 	    } catch(err) {}
-	    var folder = this.folder();
 	    var makeContours = function(ind) {
 		if (ind.some(function(x) {return x < 0})) {
 		    throw "Negative index in makeLayer";
 		}
-		var file = 'height' + ind[1] + '_time' + ind[0] + '.json';
-		var contour_path = folder + file;
-		var contour_url = 'http://appsvr.asrc.cestm.albany.edu:5000/contours?sim_id=' +
+		var contour_url = this._hysplit.data_server_url + '/contours?sim_id=' +
 		    this.sim_id + '&height=' + ind[1] +
 		    '&time=' + ind[0];
-		// return $.getJSON(contour_path).then(function(topojson) {
 		return $.getJSON(contour_url).then(function(topojson) {
 		    return L.topoJson(topojson, {
 			style: contourStyle,
 			onEachFeature: function(f, l) {onEachFeature(f, l)},
-			smoothFactor: .5,
-			file_path: contour_path
+			smoothFactor: .5
 		    });
 		});
 	    }.bind(this);
@@ -608,18 +584,7 @@ L.siteLayer = function(options) {
 L.CustomSiteLayer = L.SiteLayer.extend({
     meta_url: function() {
 	// get the url for the metadata json for this site
-	return 'http://appsvr.asrc.cestm.albany.edu:5000/metadata?sim_id=' +
-	    this.options['sim_id'];
-    },
-    folder: function() {
-	// get the path to the metadata json for this site
-	var fwd_folder;
-	if (this.fwd) {
-	    fwd_folder = 'fwd/';
-	} else {
-	    fwd_folder = 'bwd/';
-	}
-	return '/~xcite/hysplit_xcite/data/' + this.name + '/' + fwd_folder;
+	return this.options['metadata_url'];
     }
 });
 
@@ -791,9 +756,8 @@ SiteSelector.prototype.addTo = function addTo(map) {
 }
 
 
-function Hysplit(start_site_name, start_site_fwd, hysplit_data_url, hysplit_ondemand_url) {
-    this.hysplit_data_url = hysplit_data_url ? hysplit_data_url : 'http://appsvr.asrc.cestm.albany.edu/~xcite/hysplit_xcite/data';
-    this.hysplit_ondemand_url = hysplit_ondemand_url ? hysplit_ondemand_url : 'http://appsvr.asrc.cestm.albany.edu:5000';
+function Hysplit(start_site_name, start_site_fwd, data_server_url) {
+    this.data_server_url = data_server_url ? data_server_url : 'http://appsvr.asrc.cestm.albany.edu:5000';
     // this.sites = sites;
     this.contour_layer = L.layerGroup([]);
     this.ens_trajectory_layer = L.layerGroup([]);
@@ -821,13 +785,13 @@ function Hysplit(start_site_name, start_site_fwd, hysplit_data_url, hysplit_onde
 }
 
 Hysplit.prototype.getSites = function getSites() {
-    return $.getJSON('http://appsvr.asrc.cestm.albany.edu:5000/sites', function (json) {
+    return $.getJSON(this.data_server_url + '/sites', function (json) {
 	this.sites = json;
     }.bind(this));
 }
 
 Hysplit.prototype.getTimes = function getTimes() {
-    return $.getJSON('http://appsvr.asrc.cestm.albany.edu:5000/times', function(json) {
+    return $.getJSON(this.data_server_url + '/times', function(json) {
 	this.time_json = json;
 	this.dates = this.time_json['data'].map(function(x) {return new Date(x[0])});
 	this.cur_date = this.dates[0];
@@ -998,7 +962,7 @@ Hysplit.prototype.runCustomSim = function() {
     }
     // get the id of the time
     var time_id = $('#_custom_date').find(":selected").val();
-    var url = 'http://appsvr.asrc.cestm.albany.edu:5000/hysplit2?' +
+    var url = this.data_server_url + '/hysplit2?' +
 	custom_form.serialize() + '&time_id=' + time_id;
 
     $('#hysplit_message').text('Running HYSPLIT...');
@@ -1233,11 +1197,13 @@ Hysplit.prototype.changeSite = function changeSite(name, fwd, date, custom) {
     if (custom) {
 	// if custom, get the results manually
 	var fwd_str = fwd ? 'fwd' : 'bwd';
+        var sim_id = this.custom_id[fwd_str];
 	var site_options = {name: 'Custom',
-			    sim_id: this.custom_id[fwd_str],
+			    sim_id: sim_id,
 			    fwd: fwd,
 			    date: date,
-			    hysplit: this};
+			    hysplit: this,
+                            metadata_url: this.data_server_url + '/metadata?sim_id=' + sim_id};
 	var results = L.customSiteLayer(site_options);
 	results.loadData().done(function() {
 	    // remove the current layer
