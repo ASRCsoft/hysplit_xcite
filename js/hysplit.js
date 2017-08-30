@@ -1223,7 +1223,8 @@ Hysplit.prototype.update_info = function update_info() {
     }
 }
 
-Hysplit.prototype.changeSite = function changeSite(name, fwd, date, custom=false) {
+Hysplit.prototype.changeSite = function changeSite(name, fwd, date, custom) {
+    custom = (typeof custom === 'undefined') ? false : custom;
     // in case custom results are currently being shown
     if (this.custom) {
 	this.cur_site.remove();
