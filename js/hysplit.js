@@ -708,6 +708,7 @@ SiteSelector.prototype.clickMarker = function clickMarker(e) {
     var cur_fwd = this._hysplit.cur_site.fwd;
     var cur_date = this._hysplit.cur_date;
     $("#_new_site").val(new_site).change();
+    // don't need to do this because the dropdown list will do it!:
     // this._hysplit.changeSite(new_site, cur_fwd, cur_date);
 }
 
@@ -1234,12 +1235,12 @@ Hysplit.prototype.changeSite = function changeSite(name, fwd, date, custom) {
 }
 
 Hysplit.prototype.switchSite = function(stid) {
-    this.changeSite(stid, this.cur_fwd, this.cur_date, this.custom);
+    this.changeSite(stid, this.cur_fwd, this.cur_date);
 }
 
 Hysplit.prototype.changeFwd = function changeFwd(fwd) {
     var new_fwd = fwd || !this.cur_fwd;
-    this.changeSite(this.cur_name, new_fwd, this.cur_date, this.custom);
+    this.changeSite(this.cur_name, new_fwd, this.cur_date);
 }
 
 Hysplit.prototype.changeDate = function changeDate(date) {
