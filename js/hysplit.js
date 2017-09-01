@@ -540,7 +540,6 @@ L.SiteLayer = L.LayerGroup.extend({
 				fwd: this.fwd};
 	    this.trajectory = L.timeDimension.layer.geoJson2(single_trajectory_layer, traj_options);
 	    this.makeTrajectoryHeights();
-	    var folder = this.folder();
 	    var makeContours = function(ind) {
 		if (ind.some(function(x) {return x < 0})) {
 		    throw "Negative index in makeLayer";
