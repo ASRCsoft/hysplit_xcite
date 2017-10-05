@@ -473,9 +473,12 @@ L.SiteLayer = L.LayerGroup.extend({
 	}.bind(this));
     },
     displayData: function(time, height) {
-	this.contours.switchToIndex([time, parseInt(height)]);
+	this.contours.switchToIndex([time, parseInt(height)]).done(function() {
+	    this._hysplit.schools.bringToFront();
+	}.bind(this));
 	this.time = time;
 	this.height = parseInt(height);
+	
     },
     changeTime: function(time) {
 	this.displayData(time, this.height);
@@ -1110,23 +1113,23 @@ Hysplit.prototype.addSimInfo = function() {
 
 Hysplit.prototype.addLayerControl = function() {
     var this2 = this;
-    // var overlayMaps = {
-    // 	'HYSPLIT': {
-    //         'Concentration': this2.contour_layer,
-    //         'Ensemble Trajectories': this2.ens_trajectory_layer,
-    // 	    'Single Trajectory': this2.single_trajectory_layer
-    // 	},
-    // 	'Misc': {
-    // 	    'Schools': this2.schools
-    // 	}
-    // }
     var overlayMaps = {
-	'Dispersion': this2.contour_layer,
-        'Ensemble Trajectories': this2.ens_trajectory_layer,
-	'Single Trajectory': this2.single_trajectory_layer
+    	'HYSPLIT': {
+            'Dispersion': this2.contour_layer,
+            'Ensemble Trajectories': this2.ens_trajectory_layer,
+    	    'Single Trajectory': this2.single_trajectory_layer
+    	},
+    	'Other': {
+    	    'Schools': this2.schools
+    	}
     }
-    // L.control.groupedLayers(null, overlayMaps, {position: 'topleft'}).addTo(this.map);
-    L.control.layers(null, overlayMaps, {position: 'topleft'}).addTo(this.map);
+    // var overlayMaps = {
+    // 	'Dispersion': this2.contour_layer,
+    //     'Ensemble Trajectories': this2.ens_trajectory_layer,
+    // 	'Single Trajectory': this2.single_trajectory_layer
+    // }
+    // L.control.layers(null, overlayMaps, {position: 'topleft'}).addTo(this.map);
+    L.control.groupedLayers(null, overlayMaps, {position: 'topleft'}).addTo(this.map);
 }
 
 Hysplit.prototype.addTimeSlider = function addTimeSlider() {
@@ -1181,21 +1184,41 @@ Hysplit.prototype.initialize = function initialize(divid) {
 	this.addTileLayer();
 	// this.addSiteSelector();
 	this.origin_layer.addTo(this.map);
-	// $.getJSON('data/NYS_public-schools.geojson', function(json) {
-	//     var pointToCM = function(geoJsonPoint, latlng) {
-	// 	return L.circleMarker(latlng);
-	//     };
-	//     geojson_options = {pointToLayer: }
-	//     this.schools = L.geoJSON(json);
-	//     this.addLayerControl();
-	// }.bind(this))
-	this.addLayerControl();
-	this.addTimeSlider();
-	this.siteArray.addTo(this.map);
-	// console.log(this.siteArray.values);
-	this.changeSite(this.cur_name, this.cur_fwd, this.cur_date).done(function() {
-	    this.addLegend();
-	}.bind(this));
+	$.getJSON('data/NYS_public-schools.geojson', function(json) {
+	    var cm_options = {radius: 6,
+    			      weight: 2, opacity: .6,
+    			      fillOpacity: .2};
+	    var highlightFeature = function(e) {
+		var contour = e.target;
+		var tooltip_options = {sticky: true};
+		var tooltip = L.tooltip(tooltip_options);
+		contour.bindTooltip(tooltip).openTooltip();
+		contour.setTooltipContent(contour.feature.properties['NAME']);
+	    }
+	    var pointToCM = function(geoJsonPoint, latlng) {
+		var cm = L.circleMarker(latlng, cm_options);
+		cm.setTooltipContent(geoJsonPoint.properties['NAME']);
+		cm.on('mouseover', highlightFeature);
+		return cm;
+	    };
+	    geojson_options = {pointToLayer: pointToCM}
+	    this.schools = L.geoJSON(json, geojson_options);
+	    // this.map.on("layeradd", function (event) {
+	    // 	console.log(event);
+	    // 	if (event.layer._leaflet_id != this.schools._leaflet_id) {
+	    // 	    this.schools.bringToFront();   
+	    // 	};
+	    // }.bind(this));
+	    this.addLayerControl();
+	    // this.addLayerControl();
+	    this.addTimeSlider();
+	    this.siteArray.addTo(this.map);
+	    // console.log(this.siteArray.values);
+	    this.changeSite(this.cur_name, this.cur_fwd, this.cur_date).done(function() {
+		this.addLegend();
+	    }.bind(this));
+	}.bind(this))
+
     }.bind(this));
 }
 
