@@ -4,11 +4,11 @@
 // a few functions first
 
 getColor = function(d) {
-    return d >= 3  ? '#800000' :
-	d >= 2  ? '#ff6800' :
-	d >= 1  ? '#ceff29' :
-	d >= 0  ? '#29ffce' :
-	d >= -1 ? '#004cff' :
+    return d >= -10 ? '#800000' :
+	d >= -11 ? '#ff6800' :
+	d >= -12 ? '#ceff29' :
+	d >= -13 ? '#29ffce' :
+	d >= -14 ? '#004cff' :
 	'#000080';
 }
 
@@ -500,9 +500,9 @@ L.SiteLayer = L.LayerGroup.extend({
 	this.displayData(time, height_index);
 	var height = this.heights[height_index]; // the actual height value, in meters
 	if (height > 0) {
-	    units = 'ng/m<sup>3</sup>';
+	    units = 'mass/m<sup>3</sup>';
 	} else {
-	    units = 'ng/m<sup>2</sup>';
+	    units = 'mass/m<sup>2</sup>';
 	}
 	$.each($('._units_here'), function(i, x) {x.innerHTML = units});
     },
@@ -536,7 +536,7 @@ L.SiteLayer = L.LayerGroup.extend({
 	    // orientation: 'horizontal',
 	    dim: 1, // the height dimension in the layerArray
 	    labels: labels,
-	    title: 'Height AGL',
+	    title: 'Dispersion Height<br>(AGL)',
 	    // length: '50px'
 	};
 	this.height_slider = L.control.arraySlider(slider_options);
@@ -834,18 +834,18 @@ Hysplit.prototype.addTileLayer = function addTileLayer() {
 }
 
 Hysplit.prototype.getColor = function(d) {
-    return d >= 3  ? '#800000' :
-	d >= 2  ? '#ff6800' :
-	d >= 1  ? '#ceff29' :
-	d >= 0  ? '#29ffce' :
-	d >= -1 ? '#004cff' :
+    return d >= -10 ? '#800000' :
+	d >= -11 ? '#ff6800' :
+	d >= -12 ? '#ceff29' :
+	d >= -13 ? '#29ffce' :
+	d >= -14 ? '#004cff' :
 	'#000080';
 }
 
 Hysplit.prototype.addLegend = function addLegend() {
     var this2 = this;
     var legend = L.control({position: 'bottomright'});
-    var levels = [-2, -1, 0, 1, 2, 3];
+    var levels = [-15, -14, -13, -12, -11, -10];
     legend.onAdd = function (map) {
         var div = L.DomUtil.create('div', 'info legend'),
             /* grades = [0, 10, 20, 50, 100, 200, 500, 1000],*/
@@ -854,11 +854,11 @@ Hysplit.prototype.addLegend = function addLegend() {
             from, to;
         var units;
         if (this2.cur_site.heights[this2.cur_site.height] == 0) {
-            units = 'ng/m<sup>2</sup>';
+            units = 'mass/m<sup>2</sup>';
         } else {
-            units = 'ng/m<sup>3</sup>';
+            units = 'mass/m<sup>3</sup>';
         }
-	var legend_title = '<h4>Concentration<br>[<span class="_units_here">' + units + '</span>]</h4>';
+	var legend_title = '<h4>Dilution Factor<br>(<span class="_units_here">' + units + '</span>)</h4>';
         for (var i = grades.length - 1; i >= 0; i--) {
             from = grades[i];
             to = grades[i + 1];
@@ -978,8 +978,8 @@ Hysplit.prototype.runCustomSim = function() {
     }
     // check height
     var height = parseFloat(custom_form.find('input[name="height"]').val());
-    if (height < 0 || height > 200) {
-        $('#hysplit_message').text("Error: Height must be between 0 and 200.");
+    if (height < 0 || height > 2000) {
+        $('#hysplit_message').text("Error: Height must be between 0 and 2000.");
         return false;
     }
     // get the id of the time
@@ -1131,11 +1131,22 @@ Hysplit.prototype.addSimInfo = function() {
 
 Hysplit.prototype.addLayerControl = function() {
     var this2 = this;
+    // var overlayMaps = {
+    // 	'HYSPLIT': {
+    //         'Concentration': this2.contour_layer,
+    //         'Ensemble Trajectories': this2.ens_trajectory_layer,
+    // 	    'Single Trajectory': this2.single_trajectory_layer
+    // 	},
+    // 	'Misc': {
+    // 	    'Schools': this2.schools
+    // 	}
+    // }
     var overlayMaps = {
-        'Concentration': this2.contour_layer,
+	'Dispersion': this2.contour_layer,
         'Ensemble Trajectories': this2.ens_trajectory_layer,
-        'Single Trajectory': this2.single_trajectory_layer
+	'Single Trajectory': this2.single_trajectory_layer
     }
+    // L.control.groupedLayers(null, overlayMaps, {position: 'topleft'}).addTo(this.map);
     L.control.layers(null, overlayMaps, {position: 'topleft'}).addTo(this.map);
 }
 
@@ -1191,6 +1202,14 @@ Hysplit.prototype.initialize = function initialize(divid) {
 	this.addTileLayer();
 	// this.addSiteSelector();
 	this.origin_layer.addTo(this.map);
+	// $.getJSON('data/NYS_public-schools.geojson', function(json) {
+	//     var pointToCM = function(geoJsonPoint, latlng) {
+	// 	return L.circleMarker(latlng);
+	//     };
+	//     geojson_options = {pointToLayer: }
+	//     this.schools = L.geoJSON(json);
+	//     this.addLayerControl();
+	// }.bind(this))
 	this.addLayerControl();
 	this.addTimeSlider();
 	this.siteArray.addTo(this.map);
