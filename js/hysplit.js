@@ -5,10 +5,12 @@
 
 getColor = function(d) {
     return d >= -10 ? '#800000' :
-	d >= -11 ? '#ff6800' :
-	d >= -12 ? '#ceff29' :
-	d >= -13 ? '#29ffce' :
-	d >= -14 ? '#004cff' :
+	d >= -11 ? '#ff3200' :
+	d >= -12 ? '#ffb900' :
+	d >= -13 ? '#b6ff41' :
+	d >= -14 ? '#41ffb6' :
+	d >= -15 ? '#00a4ff' :
+	d >= -16 ? '#0012ff' :
 	'#000080';
 }
 
@@ -817,17 +819,19 @@ Hysplit.prototype.addTileLayer = function addTileLayer() {
 
 Hysplit.prototype.getColor = function(d) {
     return d >= -10 ? '#800000' :
-	d >= -11 ? '#ff6800' :
-	d >= -12 ? '#ceff29' :
-	d >= -13 ? '#29ffce' :
-	d >= -14 ? '#004cff' :
+	d >= -11 ? '#ff3200' :
+	d >= -12 ? '#ffb900' :
+	d >= -13 ? '#b6ff41' :
+	d >= -14 ? '#41ffb6' :
+	d >= -15 ? '#00a4ff' :
+	d >= -16 ? '#0012ff' :
 	'#000080';
 }
 
 Hysplit.prototype.addLegend = function addLegend() {
     var this2 = this;
     var legend = L.control({position: 'bottomright'});
-    var levels = [-15, -14, -13, -12, -11, -10];
+    var levels = [-17, -16, -15, -14, -13, -12, -11, -10];
     legend.onAdd = function (map) {
         var div = L.DomUtil.create('div', 'info legend'),
             /* grades = [0, 10, 20, 50, 100, 200, 500, 1000],*/
