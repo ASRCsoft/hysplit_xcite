@@ -28,8 +28,10 @@ highlightFeature = function(e) {
     var contour = e.target;
     var tooltip_options = {sticky: true};
     var tooltip = L.tooltip(tooltip_options);
+    var text = '</sup> m<sup>-3</sup>';
+    text = '10<sup>' + contour.feature.properties.level + text;
     contour.bindTooltip(tooltip).openTooltip();
-    contour.setTooltipContent(contour.feature.properties.level_name);
+    contour.setTooltipContent(text);
 }
 
 addHeightGraph = function(e) {
@@ -495,9 +497,9 @@ L.SiteLayer = L.LayerGroup.extend({
 	this.displayData(time, height_index);
 	var height = this.heights[height_index]; // the actual height value, in meters
 	if (height > 0) {
-	    units = 'mass/m<sup>3</sup>';
+	    units = 'm<sup>-3</sup>';
 	} else {
-	    units = 'mass/m<sup>2</sup>';
+	    units = 'm<sup>-2</sup>';
 	}
 	$.each($('._units_here'), function(i, x) {x.innerHTML = units});
     },
@@ -840,9 +842,9 @@ Hysplit.prototype.addLegend = function addLegend() {
             from, to;
         var units;
         if (this2.cur_site.heights[this2.cur_site.height] == 0) {
-            units = 'mass/m<sup>2</sup>';
+            units = 'm<sup>-2</sup>';
         } else {
-            units = 'mass/m<sup>3</sup>';
+            units = 'm<sup>-3</sup>';
         }
 	var legend_title = '<h4>Dilution Factor<br>(<span class="_units_here">' + units + '</span>)</h4>';
         for (var i = grades.length - 1; i >= 0; i--) {
