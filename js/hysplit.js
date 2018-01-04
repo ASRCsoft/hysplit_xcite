@@ -765,7 +765,7 @@ SiteSelector.prototype.addTo = function addTo(map) {
 
 
 function Hysplit(start_site_name, start_site_fwd, data_server_url) {
-    this.data_server_url = data_server_url ? data_server_url : 'http://appsvr.asrc.cestm.albany.edu:5000';
+    this.data_server_url = data_server_url ? data_server_url : 'http://pireds.asrc.cestm.albany.edu:5000';
     // this.sites = sites;
     this.contour_layer = L.layerGroup([]);
     this.ens_trajectory_layer = L.layerGroup([]);
